@@ -1,0 +1,179 @@
+{% extends "admin/base.html" %}
+{% set active = 'tools' %}
+{% block title %}工具管理{% endblock %}
+
+{% block main %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="text-xl md:text-2xl font-semibold text-[#1e293b]">工具管理</h1>
+    <p class="mt-1 text-sm text-gray-600">粘贴 MCP 配置（mcpServers JSON），再在角色里挂载给员工。</p>
+  </div>
+  <a href="/admin/tools/new"
+     class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-[#3b82f6] text-white px-4 py-2 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.4)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+    新建工具
+  </a>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+  {% if tools %}
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[1000px] text-sm">
+      <thead>
+        <tr class="border-b border-gray-100 text-left text-xs font-medium text-gray-500">
+          <th class="w-[15%] px-4 md:px-6 py-3">名称</th>
+          <th class="w-[14%] px-4 py-3">MCP 服务</th>
+          <th class="w-[18%] px-4 py-3">描述</th>
+          <th class="w-[20%] px-4 py-3">已发现工具</th>
+          <th class="w-[9%] px-4 py-3">挂载员工</th>
+          <th class="w-[8%] px-4 py-3">状态</th>
+          <th class="w-[16%] px-4 md:px-6 py-3 text-right">操作</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for t in tools %}
+        <tr class="align-top transition-colors duration-150 ease-out hover:bg-gray-50">
+          <td class="px-4 md:px-6 py-3.5">
+            <div class="truncate font-medium text-[#1e293b]" title="{{ t.name }}">{{ t.name }}</div>
+            <div class="mt-0.5 max-w-[10rem] truncate font-mono text-xs text-gray-500" title="{{ t.slug }}">{{ t.slug }}</div>
+          </td>
+          <td class="px-4 py-3.5">
+            {% if servers.get(t.id) %}
+            <div class="flex flex-wrap gap-1">
+              {% for s in servers.get(t.id) %}
+              <span class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-600">{{ s }}</span>
+              {% endfor %}
+            </div>
+            {% else %}
+            <span class="text-xs text-gray-300">无</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3.5">
+            {% if t.description %}
+            <p class="line-clamp-2 max-w-[24rem] text-xs leading-relaxed text-gray-600" title="{{ t.description }}">{{ t.description }}</p>
+            {% else %}
+            <span class="text-xs text-gray-300">未填写</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3.5">
+            {% set found = available.get(t.id) or [] %}
+            {% if found %}
+            <details class="group">
+              <summary class="flex cursor-pointer select-none flex-wrap items-center gap-1.5">
+                <span class="inline-flex items-center rounded-full bg-[#10b981]/10 px-2 py-0.5 text-xs font-medium text-[#0f7f5c]">{{ found|length }} 个</span>
+                <span class="text-[11px] text-gray-500 group-open:hidden">查看</span>
+              </summary>
+              <ul class="mt-1.5 max-h-32 space-y-1 overflow-y-auto thin-scroll pr-1">
+                {% for item in found %}
+                <li class="truncate font-mono text-[11px] text-gray-600" title="{{ item.name }}{% if item.description %} — {{ item.description }}{% endif %}">{{ item.name }}</li>
+                {% endfor %}
+              </ul>
+            </details>
+            {% else %}
+            <span class="text-xs text-gray-400">未拉取</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3.5">
+            {% if t.agent_roles %}
+            <span class="inline-flex items-center rounded-full bg-[#3b82f6]/10 px-2 py-0.5 text-xs font-medium text-[#3b82f6]" title="{% for r in t.agent_roles %}{{ r.name }}{% if not loop.last %}、{% endif %}{% endfor %}">
+              {{ t.agent_roles|length }} 位
+            </span>
+            {% else %}
+            <span class="text-xs text-gray-400">未挂载</span>
+            {% endif %}
+          </td>
+          <td class="px-4 py-3.5">
+            {% if t.enabled %}
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-[#10b981]/10 px-2 py-0.5 text-xs font-medium text-[#0f7f5c]">
+              <span class="h-1.5 w-1.5 rounded-full bg-[#10b981]"></span>启用
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+              <span class="h-1.5 w-1.5 rounded-full bg-gray-400"></span>停用
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-4 md:px-6 py-3.5 text-right whitespace-nowrap">
+            <form method="post" action="/admin/tools/{{ t.id }}/refresh" class="mr-2 inline-block"
+                  onsubmit="const b=this.querySelector('button');b.disabled=true;b.textContent='拉取中…';">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button type="submit"
+                      class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-[#0f7f5c] border border-gray-200 px-3 py-1.5 hover:bg-emerald-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(16,185,129,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#10b981] focus:ring-offset-2">
+                拉取工具
+              </button>
+            </form>
+            <a href="/admin/tools/{{ t.id }}/edit"
+               class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-gray-700 border border-gray-200 px-3 py-1.5 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+              编辑
+            </a>
+            <form method="post" action="/admin/tools/{{ t.id }}/delete" class="ml-2 inline-block"
+                  onsubmit="return confirm('确定删除「{{ t.name }}」？已挂载它{{ '的 ' ~ t.agent_roles|length ~ ' 位员工会被解绑。' if t.agent_roles else '' }}');">
+              <input type="hidden" name="csrf" value="{{ csrf }}">
+              <button type="submit"
+                      class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-[#ef4444] border border-gray-200 px-3 py-1.5 hover:bg-red-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(239,68,68,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#ef4444] focus:ring-offset-2">
+                删除
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="px-6 py-16 text-center">
+    <p class="text-sm text-gray-600">还没有工具。</p>
+    <a href="/admin/tools/new"
+       class="mt-3 inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-[#3b82f6] text-white px-4 py-2 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.4)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+      粘贴一段 MCP 配置
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block side %}
+{% set enabled_count = tools|selectattr('enabled')|list|length %}
+{% set mounted_count = tools|selectattr('agent_roles')|list|length %}
+
+<div class="rounded-xl border border-gray-100 bg-white p-4 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-md">
+  <h2 class="text-sm font-semibold text-[#1e293b]">概览</h2>
+  <dl class="mt-3 space-y-2.5 text-sm">
+    <div class="flex items-center justify-between">
+      <dt class="text-gray-600">工具总数</dt>
+      <dd class="font-medium text-[#1e293b]">{{ tools|length }}</dd>
+    </div>
+    <div class="flex items-center justify-between">
+      <dt class="text-gray-600">已启用</dt>
+      <dd class="font-medium text-[#1e293b]">{{ enabled_count }}</dd>
+    </div>
+    <div class="flex items-center justify-between">
+      <dt class="text-gray-600">已挂载</dt>
+      <dd class="font-medium text-[#1e293b]">{{ mounted_count }}</dd>
+    </div>
+  </dl>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-md">
+  <h2 class="text-sm font-semibold text-[#1e293b]">快捷操作</h2>
+  <div class="mt-3 space-y-2">
+    <a href="/admin/tools/new"
+       class="block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#3b82f6]">
+      新建工具
+    </a>
+    <a href="/admin/roles"
+       class="block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#3b82f6]">
+      去角色里挂载
+    </a>
+  </div>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">说明</h2>
+  <ul class="mt-3 space-y-2 text-xs text-gray-600 list-disc pl-4">
+    <li>配置沿用 Claude Desktop 的 mcpServers 格式。</li>
+    <li>点「拉取工具」即时连接 MCP 服务，把实际工具清单存下来。</li>
+    <li>拉取后可在角色里勾选具体工具，不勾选则默认全部。</li>
+    <li>停用的工具不会被加载。</li>
+  </ul>
+</div>
+{% endblock %}

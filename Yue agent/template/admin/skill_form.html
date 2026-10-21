@@ -1,0 +1,194 @@
+{% extends "admin/base.html" %}
+{% set active = 'skills' %}
+{% block title %}{{ "编辑技能" if mode == "edit" else "新建技能" }}{% endblock %}
+
+{% block main %}
+{% set input_cls = "w-full bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm text-[#1e293b] placeholder-gray-400 transition-all duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:border-transparent" %}
+
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <a href="/admin/skills" class="text-xs text-gray-500 transition-colors duration-150 ease-out hover:text-[#3b82f6]">← 返回技能列表</a>
+    <h1 class="mt-1 text-xl md:text-2xl font-semibold text-[#1e293b]">
+      {{ "编辑技能" if mode == "edit" else "新建技能" }}
+    </h1>
+    <p class="mt-1 text-sm text-gray-600">内容按 SKILL.md 组织，保存并启用后会出现在对话页的技能列表里。</p>
+  </div>
+</div>
+
+<div class="max-w-5xl bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
+  {% if errors %}
+  <div class="mb-5 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-sm text-[#b91c1c]" role="alert">
+    <ul class="list-disc pl-4 space-y-1">
+      {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="post"
+        action="{{ '/admin/skills/' ~ skill_id ~ '/edit' if mode == 'edit' else '/admin/skills' }}"
+        class="space-y-5">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label for="slug" class="mb-1.5 block text-sm font-medium text-gray-700">slug</label>
+        <input id="slug" type="text" name="slug" value="{{ form.slug }}"
+               pattern="[a-z0-9][a-z0-9_-]*" maxlength="50" required
+               class="{{ input_cls }}">
+        <p class="mt-1.5 text-xs text-gray-500">小写字母、数字、下划线或短横线；load_skill 也接受这个值</p>
+      </div>
+      <div>
+        <label for="name" class="mb-1.5 block text-sm font-medium text-gray-700">名称</label>
+        <input id="name" type="text" name="name" value="{{ form.name }}" maxlength="100" required
+               class="{{ input_cls }}">
+      </div>
+    </div>
+
+    <div>
+      <label for="description" class="mb-1.5 block text-sm font-medium text-gray-700">描述</label>
+      <input id="description" type="text" name="description" value="{{ form.description }}" maxlength="2000"
+             class="{{ input_cls }}">
+      <p class="mt-1.5 text-xs text-gray-500">会出现在 load_skill 的工具说明里，写清楚「什么时候该用这个技能」</p>
+    </div>
+
+    <div>
+      <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <label for="content" class="block text-sm font-medium text-gray-700">技能正文</label>
+        <label for="skill_file"
+               class="inline-flex cursor-pointer items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-all duration-150 ease-out hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus-within:ring-2 focus-within:ring-[#3b82f6] focus-within:ring-offset-2">
+          读取 SKILL.md
+        </label>
+        <input id="skill_file" type="file" accept=".md,text/markdown,text/plain" class="sr-only">
+      </div>
+      <textarea id="content" name="content" required rows="20" spellcheck="false"
+                class="{{ input_cls }} font-mono text-xs leading-relaxed"
+                placeholder="# 技能标题&#10;&#10;目标、步骤、边界、输出格式……">{{ form.content }}</textarea>
+      <p class="mt-1.5 text-xs text-gray-500">
+        选择 SKILL.md 会自动解析 frontmatter（name / description），正文填进这里。
+        用户在对话页选中这个技能时，正文会注入本次任务的运行提示词。
+      </p>
+    </div>
+
+    <div>
+      <span class="mb-1.5 block text-sm font-medium text-gray-700">状态</span>
+      <label class="inline-flex items-center gap-2 pt-1 text-sm text-gray-700">
+        <input id="enabled" type="checkbox" name="enabled" value="1"
+               {% if form.enabled %}checked{% endif %}
+               class="h-4 w-4 rounded border-gray-300 text-[#3b82f6] transition-colors duration-150 ease-out focus:ring-2 focus:ring-[#3b82f6]">
+        启用
+      </label>
+      <p class="mt-1.5 text-xs text-gray-500">停用后不会出现在对话页的技能列表里，员工也无法加载</p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-5">
+      <button type="submit"
+              class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-[#3b82f6] text-white px-4 py-2 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.4)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+        保存
+      </button>
+      <a href="/admin/skills"
+         class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-gray-700 border border-gray-200 px-4 py-2 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+        取消
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block side %}
+<div class="rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">SKILL.md 格式</h2>
+  <pre class="mt-3 overflow-x-auto rounded-lg bg-gray-50 p-3 font-mono text-[11px] leading-relaxed text-gray-600">---
+name: script-writing
+description: 把大纲扩写成剧本
+---
+
+# 正文
+
+步骤、边界、输出格式……</pre>
+  <p class="mt-2 text-xs text-gray-500">frontmatter 可选；没有时用文件名作为名称。</p>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">运行时行为</h2>
+  <ul class="mt-3 space-y-2 text-xs text-gray-600 list-disc pl-4">
+    <li>技能是全局的，不需要挂载给员工。</li>
+    <li>用户在对话页选中后，本次任务会强制按它执行。</li>
+    <li>没选时，员工可通过 <code class="font-mono">load_skill</code> 按需加载。</li>
+    <li>修改后下一次对话会自动重建图。</li>
+  </ul>
+</div>
+
+{% if mode == "edit" %}
+<div class="mt-4 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/5 p-4">
+  <h2 class="text-sm font-semibold text-[#b91c1c]">删除技能</h2>
+  <p class="mt-1.5 text-xs text-gray-600">删除后，对话页将无法再选择这个技能。</p>
+  <form method="post" action="/admin/skills/{{ skill_id }}/delete" class="mt-3"
+        onsubmit="return confirm('确定删除「{{ form.name }}」？');">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit"
+            class="inline-flex w-full items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-[#ef4444] border border-gray-200 px-3 py-1.5 hover:bg-red-50 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#ef4444] focus:ring-offset-2">
+      删除这个技能
+    </button>
+  </form>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block tail %}
+<script>
+  (function () {
+    const file = document.getElementById('skill_file');
+    const content = document.getElementById('content');
+    if (!file || !content) return;
+
+    // 与后端 parse_skill_markdown 保持一致：只解析简单的 key: value
+    function parseSkillMd(text) {
+      const normalized = String(text || '').replace(/\r\n?/g, '\n');
+      let meta = {};
+      let body = normalized.trim();
+      if (normalized.startsWith('---\n')) {
+        const end = normalized.indexOf('\n---', 4);
+        if (end !== -1) {
+          normalized.slice(4, end).split('\n').forEach(function (line) {
+            line = line.trim();
+            const i = line.indexOf(':');
+            if (i <= 0) return;
+            let value = line.slice(i + 1).trim();
+            if (value.length >= 2 && value[0] === value[value.length - 1] &&
+                (value[0] === '"' || value[0] === "'")) {
+              value = value.slice(1, -1);
+            }
+            meta[line.slice(0, i).trim()] = value;
+          });
+          body = normalized.slice(end + 4).replace(/^\n+/, '').trim();
+        }
+      }
+      return { meta: meta, body: body };
+    }
+
+    file.addEventListener('change', function () {
+      const picked = file.files && file.files[0];
+      if (!picked) return;
+      const reader = new FileReader();
+      reader.onload = function () {
+        const parsed = parseSkillMd(reader.result);
+        content.value = parsed.body;
+
+        const nameEl = document.getElementById('name');
+        const slugEl = document.getElementById('slug');
+        const descEl = document.getElementById('description');
+        if (nameEl && parsed.meta.name) nameEl.value = parsed.meta.name;
+        if (descEl && parsed.meta.description) descEl.value = parsed.meta.description;
+        if (slugEl && !slugEl.value && parsed.meta.name) {
+          slugEl.value = parsed.meta.name
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        }
+        content.dispatchEvent(new Event('input', { bubbles: true }));
+      };
+      reader.readAsText(picked, 'utf-8');
+    });
+  })();
+</script>
+{% endblock %}

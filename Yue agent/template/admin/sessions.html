@@ -1,0 +1,212 @@
+{% extends "admin/base.html" %}
+{% set active = 'sessions' %}
+{% block title %}会话管理{% endblock %}
+
+{% block main %}
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <h1 class="text-xl md:text-2xl font-semibold text-[#1e293b]">会话管理</h1>
+    <p class="mt-1 text-sm text-gray-600">查看前台保存的会话与消息；删除会话会连同已保存的对话一起清理。</p>
+    <p class="mt-1 text-xs text-gray-400">只保存用户输入与最终答复，员工内部的工具调用不会出现在这里。</p>
+  </div>
+  <form method="get" action="/admin/sessions" class="flex flex-wrap items-center gap-2">
+    <input type="search" name="q" value="{{ q }}" maxlength="100"
+           placeholder="搜索标题或 session_id"
+           class="w-56 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-[#1e293b] placeholder:text-gray-400 focus:border-[#3b82f6] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/20">
+    <button type="submit"
+            class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-gray-700 border border-gray-200 px-4 py-2 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+      搜索
+    </button>
+    {% if q %}
+    <a href="/admin/sessions"
+       class="inline-flex items-center justify-center rounded-lg font-medium text-sm text-gray-600 px-3 py-2 hover:text-[#3b82f6] hover:underline">
+      清除
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+{% if sessions %}
+<form method="post" action="/admin/sessions/delete" id="sessions_form">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <input type="hidden" name="next_q" value="{{ q }}">
+  <input type="hidden" name="next_page" value="{{ page }}">
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[900px] text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 text-left text-xs font-medium text-gray-500">
+            <th class="w-[4%] px-4 md:px-6 py-3">
+              <input type="checkbox" id="select_all" aria-label="全选本页会话"
+                     class="h-4 w-4 cursor-pointer rounded border-gray-300 text-[#3b82f6] focus:ring-[#3b82f6]">
+            </th>
+            <th class="w-[26%] px-4 py-3">会话</th>
+            <th class="w-[26%] px-4 py-3">最后一条消息</th>
+            <th class="w-[17%] px-4 py-3">工作目录</th>
+            <th class="w-[7%] px-4 py-3">消息</th>
+            <th class="w-[10%] px-4 py-3">更新时间</th>
+            <th class="w-[10%] px-4 md:px-6 py-3 text-right">操作</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {% for s in sessions %}
+          <tr class="transition-colors duration-150 ease-out hover:bg-gray-50">
+            <td class="px-4 md:px-6 py-3.5">
+              <input type="checkbox" name="session_ids" value="{{ s.session_id }}"
+                     aria-label="选择会话 {{ s.session_id }}"
+                     class="session-check h-4 w-4 cursor-pointer rounded border-gray-300 text-[#3b82f6] focus:ring-[#3b82f6]">
+            </td>
+            <td class="px-4 py-3.5">
+              <a href="/admin/sessions/{{ s.session_id }}"
+                 class="flex min-w-0 items-center gap-1.5 whitespace-nowrap font-medium text-[#1e293b] hover:text-[#3b82f6]">
+                <span class="min-w-0 truncate" title="{{ s.title or s.session_id }}">{{ s.title or "未命名会话" }}</span>
+              </a>
+              <div class="mt-0.5 max-w-[16rem] truncate font-mono text-xs text-gray-500" title="{{ s.session_id }}">{{ s.session_id }}</div>
+            </td>
+            <td class="px-4 py-3.5">
+              {% if s.last_message %}
+              <p class="line-clamp-2 max-w-[24rem] text-xs leading-relaxed text-gray-600" title="{{ s.last_message }}">{{ s.last_message }}</p>
+              {% else %}
+              <span class="text-xs text-gray-300">暂无消息</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3.5">
+              {% if s.workdir %}
+              <span class="inline-block max-w-[14rem] truncate align-bottom font-mono text-[11px] text-gray-500" title="{{ s.workdir }}">{{ s.workdir }}</span>
+              {% else %}
+              <span class="text-xs text-gray-400">默认</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3.5 text-xs text-gray-600 tabular-nums whitespace-nowrap">{{ s.message_count }}</td>
+            <td class="px-4 py-3.5 whitespace-nowrap font-mono text-[11px] text-gray-500">
+              {{ s.updated_at.strftime("%Y-%m-%d %H:%M") if s.updated_at else "—" }}
+            </td>
+            <td class="px-4 md:px-6 py-3.5 text-right whitespace-nowrap">
+              <a href="/admin/sessions/{{ s.session_id }}"
+                 class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-gray-700 border border-gray-200 px-3 py-1.5 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+                查看
+              </a>
+              <button type="submit" formaction="/admin/sessions/{{ s.session_id }}/delete"
+                      onclick="return confirm('确定删除该会话？已保存的对话消息会一起删除，且无法恢复。');"
+                      class="ml-2 inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-[#ef4444] border border-gray-200 px-3 py-1.5 hover:bg-red-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(239,68,68,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#ef4444] focus:ring-offset-2">
+                删除
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50 px-4 md:px-6 py-3 text-xs text-gray-600">
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="submit" id="bulk_delete"
+                class="inline-flex items-center justify-center rounded-lg font-medium text-sm bg-white text-[#ef4444] border border-gray-200 px-3 py-1.5 transition-colors duration-150 ease-out hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-[#ef4444] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled>
+          删除选中
+        </button>
+        <span id="selected_count">已选 0 个</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <span>共 {{ total }} 个会话 · 第 {{ page }} / {{ pages }} 页</span>
+        <a href="/admin/sessions?page={{ page - 1 }}{% if q %}&q={{ q|urlencode }}{% endif %}"
+           class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:text-[#3b82f6] {% if page <= 1 %}pointer-events-none opacity-40{% endif %}">
+          上一页
+        </a>
+        <a href="/admin/sessions?page={{ page + 1 }}{% if q %}&q={{ q|urlencode }}{% endif %}"
+           class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:text-[#3b82f6] {% if page >= pages %}pointer-events-none opacity-40{% endif %}">
+          下一页
+        </a>
+      </div>
+    </div>
+  </div>
+</form>
+{% else %}
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 px-6 py-16 text-center">
+  {% if q %}
+  <p class="text-sm text-gray-600">没有匹配「{{ q }}」的会话。</p>
+  <a href="/admin/sessions" class="mt-3 inline-block text-sm font-medium text-[#3b82f6] hover:underline">查看全部会话 →</a>
+  {% else %}
+  <p class="text-sm text-gray-600">还没有任何会话。</p>
+  <p class="mt-1 text-xs text-gray-400">前台发起对话后，这里会保存用户输入与最终答复。</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block side %}
+<div class="rounded-xl border border-gray-100 bg-white p-4 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-md">
+  <h2 class="text-sm font-semibold text-[#1e293b]">概览</h2>
+  <dl class="mt-3 space-y-2.5 text-sm">
+    <div class="flex items-center justify-between">
+      <dt class="text-gray-600">会话总数</dt>
+      <dd class="font-medium text-[#1e293b]">{{ total if not q else "—" }}</dd>
+    </div>
+    {% if q %}
+    <div class="flex items-center justify-between">
+      <dt class="text-gray-600">匹配结果</dt>
+      <dd class="font-medium text-[#1e293b]">{{ total }}</dd>
+    </div>
+    {% endif %}
+    <div class="flex items-center justify-between">
+      <dt class="text-gray-600">消息总数</dt>
+      <dd class="font-medium text-[#1e293b]">{{ total_messages }}</dd>
+    </div>
+  </dl>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">说明</h2>
+  <ul class="mt-3 space-y-2 text-xs text-gray-600 list-disc pl-4">
+    <li>会话由前台创建，会话标识由前端生成。</li>
+    <li>删除会话会同时清理 chat_messages 里的记录。</li>
+    <li>批量删除只作用于当前勾选的会话。</li>
+    <li>删除不可恢复，操作前请确认。</li>
+  </ul>
+</div>
+{% endblock %}
+
+{% block tail %}
+<script>
+  (function () {
+    const selectAll = document.getElementById("select_all");
+    const checks = Array.from(document.querySelectorAll(".session-check"));
+    const bulk = document.getElementById("bulk_delete");
+    const counter = document.getElementById("selected_count");
+
+    function sync() {
+      const picked = checks.filter((c) => c.checked).length;
+      if (counter) counter.textContent = "已选 " + picked + " 个";
+      if (bulk) bulk.disabled = picked === 0;
+      if (selectAll) {
+        selectAll.checked = picked > 0 && picked === checks.length;
+        selectAll.indeterminate = picked > 0 && picked < checks.length;
+      }
+    }
+
+    if (selectAll) {
+      selectAll.addEventListener("change", function () {
+        checks.forEach((c) => { c.checked = selectAll.checked; });
+        sync();
+      });
+    }
+    checks.forEach((c) => c.addEventListener("change", sync));
+
+    if (bulk) {
+      bulk.addEventListener("click", function (e) {
+        const picked = checks.filter((c) => c.checked).length;
+        if (!picked) {
+          e.preventDefault();
+          return;
+        }
+        if (!confirm("确定删除选中的 " + picked + " 个会话？已保存的对话消息会一起删除，且无法恢复。")) {
+          e.preventDefault();
+        }
+      });
+    }
+
+    sync();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,1154 @@
+{% extends "admin/base.html" %}
+{% set active = 'playground' %}
+{% block title %}测试对话{% endblock %}
+
+{% block main %}
+<div id="playground" data-csrf="{{ csrf }}" class="flex flex-col">
+
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="text-xl md:text-2xl font-semibold text-[#1e293b]">测试对话</h1>
+      <p class="mt-1 text-sm text-gray-600">直接和调度员对话，观察节点流转与 SSE 增量输出。</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" id="new-session-btn"
+              class="inline-flex items-center justify-center gap-1.5 rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-[#3b82f6]/10 text-[#2563eb] border border-[#3b82f6]/30 px-4 py-2 hover:bg-[#3b82f6]/15 hover:-translate-y-0.5 active:scale-[0.98] active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" stroke-linecap="round"/>
+        </svg>
+        新会话
+      </button>
+      <button type="button" id="clear-btn"
+              class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-gray-700 border border-gray-200 px-4 py-2 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+        清空对话
+      </button>
+    </div>
+  </div>
+
+  <div class="flex flex-1 flex-col overflow-hidden bg-white rounded-xl shadow-sm border border-gray-100">
+
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-4 py-2.5">
+      <div class="flex items-center gap-2 text-xs text-gray-500">
+        <span id="status-dot" class="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-300"></span>
+        <span id="status-text" class="no-break tabular-nums">空闲</span>
+        <span id="node-badge"
+              class="hidden items-center rounded-full bg-[#3b82f6]/10 px-2 py-0.5 text-xs font-medium text-[#3b82f6]">
+          正在处理
+        </span>
+      </div>
+      <button type="button" id="session-btn"
+              title="复制完整会话 ID"
+              class="inline-flex max-w-full items-center gap-1.5 rounded-md px-2 py-1 text-xs text-gray-400 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-1">
+        <svg class="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M8 7V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" stroke-linecap="round"/>
+          <rect x="3" y="8" width="13" height="13" rx="2"/>
+        </svg>
+        <span class="no-break">会话</span>
+        <span id="session-id" class="truncate font-mono text-gray-500">—</span>
+      </button>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-2">
+      <label for="workdir" class="no-break inline-flex items-center gap-1.5 text-xs font-medium text-gray-600">
+        <svg class="h-3.5 w-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        会话工作目录
+      </label>
+      <input id="workdir" type="text" maxlength="1000" spellcheck="false"
+             placeholder="留空 = 使用员工提示词里的默认目录"
+             title="本次会话进行文件操作时的根目录；保存后同一会话的后续请求都会带上"
+             class="min-w-0 flex-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 font-mono text-xs text-gray-700 placeholder:font-sans placeholder-gray-400 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:border-transparent">
+      <span id="workdir-hint" class="hidden text-[11px] text-emerald-600">已保存</span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-4 py-2">
+      <label for="skill-select" class="no-break inline-flex items-center gap-1.5 text-xs font-medium text-gray-600">
+        <svg class="h-3.5 w-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+          <path d="M12 3 2 8l10 5 10-5-10-5z" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="m2 14 10 5 10-5M2 11l10 5 10-5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        技能
+      </label>
+      <select id="skill-select"
+              title="选中后，本次任务会强制按这个技能执行；留空则让员工自行判断"
+              class="min-w-0 max-w-full flex-1 rounded-md border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-gray-700 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:border-transparent sm:max-w-xs">
+        <option value="">不指定（员工自行判断）</option>
+      </select>
+      <a href="/admin/skills" class="no-break text-[11px] text-gray-400 transition-colors duration-150 hover:text-[#3b82f6]">管理技能 →</a>
+    </div>
+
+    <div id="messages"
+         class="thin-scroll flex-1 space-y-3 overflow-y-auto bg-[#f8fafc] px-4 py-4"
+         style="min-height: 280px;">
+      <div class="mx-auto flex max-w-md flex-col items-center py-10 text-center" id="empty-hint">
+        <div class="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#3b82f6]/10 text-[#3b82f6]">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <p class="text-sm font-medium text-gray-600">发一条消息开始测试</p>
+        <p class="mt-1 text-xs text-gray-400">观察调度员派发、思考过程、工具调用与节点流转</p>
+        <div class="mt-5 flex flex-wrap justify-center gap-2">
+          <button type="button" class="example-btn rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition-colors duration-150 hover:border-[#3b82f6]/40 hover:bg-[#3b82f6]/5 hover:text-[#2563eb]"
+                  data-prompt="帮我安排一下今天的任务">帮我安排一下今天的任务</button>
+          <button type="button" class="example-btn rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition-colors duration-150 hover:border-[#3b82f6]/40 hover:bg-[#3b82f6]/5 hover:text-[#2563eb]"
+                  data-prompt="介绍一下你自己">介绍一下你自己</button>
+          <button type="button" class="example-btn rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 transition-colors duration-150 hover:border-[#3b82f6]/40 hover:bg-[#3b82f6]/5 hover:text-[#2563eb]"
+                  data-prompt="给我讲一个短故事">给我讲一个短故事</button>
+        </div>
+      </div>
+    </div>
+
+    <form id="composer" class="border-t border-gray-100 p-3">
+      <div class="flex items-end gap-2">
+        <textarea id="input" rows="2" maxlength="20000" required
+                  placeholder="输入测试内容，Enter 发送，Shift + Enter 换行"
+                  class="thin-scroll w-full resize-none bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm leading-6 text-[#1e293b] placeholder-gray-400 transition-all duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:border-transparent"
+                  style="max-height: 11rem;"></textarea>
+        <button type="submit" id="send-btn"
+                class="inline-flex flex-shrink-0 items-center justify-center gap-1.5 rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-[#3b82f6] text-white px-4 py-2.5 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.4)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-none">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          发送
+        </button>
+        <button type="button" id="stop-btn"
+                class="hidden flex-shrink-0 items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-[#ef4444] border border-gray-200 px-4 py-2.5 hover:bg-red-50 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#ef4444] focus:ring-offset-2">
+          停止
+        </button>
+      </div>
+      <div class="mt-2 flex items-center justify-between gap-3 text-xs text-gray-400">
+        <p class="min-w-0 truncate">Enter 发送 · Shift + Enter 换行 · 请求使用当前管理员会话</p>
+        <span id="char-count" class="flex-shrink-0 tabular-nums"></span>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block side %}
+<div class="rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">测试前提</h2>
+  <ul class="mt-3 space-y-2 text-xs text-gray-600 list-disc pl-4">
+    <li>已配置默认厂商</li>
+    <li>恰好一个启用的调度员</li>
+    <li>调度员提示词包含 <span class="whitespace-nowrap font-mono">{{ '{{WORKERS}}' }}</span></li>
+  </ul>
+  <p class="mt-3 text-xs text-gray-500">
+    修改角色或厂商后，下一次对话会自动重建图。
+  </p>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">事件说明</h2>
+  <dl class="mt-3 space-y-2 text-xs text-gray-600">
+    <div><dt class="inline font-mono text-[#3b82f6]">node</dt><dd class="inline"> 进入某个员工或调度员</dd></div>
+    <div><dt class="inline font-mono text-[#3b82f6]">reasoning</dt><dd class="inline"> 思考内容增量</dd></div>
+    <div><dt class="inline font-mono text-[#3b82f6]">token</dt><dd class="inline"> 正文增量文本</dd></div>
+    <div><dt class="inline font-mono text-[#3b82f6]">tool_call</dt><dd class="inline"> 工具调用（name / args）</dd></div>
+    <div><dt class="inline font-mono text-[#3b82f6]">state</dt><dd class="inline"> 状态摘要（最近消息 / next / nodes）</dd></div>
+    <div><dt class="inline font-mono text-[#3b82f6]">done</dt><dd class="inline"> 最终答复</dd></div>
+    <div><dt class="inline font-mono text-[#ef4444]">error</dt><dd class="inline"> 调用失败</dd></div>
+  </dl>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">使用提示</h2>
+  <ul class="mt-3 space-y-2 text-xs text-gray-600 list-disc pl-4">
+    <li>每轮回复上方会列出经过的节点</li>
+    <li>思考过程在正文开始后自动收起</li>
+    <li>状态摘要可展开并一键复制</li>
+    <li>生成中按 <kbd class="rounded border border-gray-200 bg-gray-50 px-1 font-mono">Esc</kbd> 停止</li>
+  </ul>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4 transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-md">
+  <h2 class="text-sm font-semibold text-[#1e293b]">快捷操作</h2>
+  <div class="mt-3 space-y-2">
+    <a href="/admin/roles"
+       class="block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#3b82f6]">
+      检查角色配置
+    </a>
+    <a href="/admin/providers"
+       class="block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#3b82f6]">
+      检查厂商配置
+    </a>
+    <a href="/admin/providers/new"
+       class="block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#3b82f6]">
+      新增厂商
+    </a>
+    <a href="/docs" target="_blank" rel="noopener"
+       class="block rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#3b82f6]">
+      API 文档
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block tail %}
+<style>
+  /* 聊天区域占满可视高度，消息区内滚动，输入框始终可见 */
+  #playground { height: calc(100vh - 13rem); min-height: 24rem; }
+  @supports (height: 100dvh) {
+    #playground { height: calc(100dvh - 13rem); }
+  }
+  @media (max-width: 767px) {
+    #playground { height: calc(100vh - 15rem); }
+    @supports (height: 100dvh) {
+      #playground { height: calc(100dvh - 15rem); }
+    }
+  }
+
+  /* Markdown 正文排版（Tailwind preflight 会清掉默认列表与标题样式） */
+  .md-body { line-height: 1.75; }
+  .md-body > *:first-child { margin-top: 0; }
+  .md-body > *:last-child { margin-bottom: 0; }
+  .md-body p { margin: 0.5em 0; }
+  .md-body h1, .md-body h2, .md-body h3, .md-body h4 {
+    margin: 0.9em 0 0.4em; font-weight: 600; line-height: 1.4;
+  }
+  .md-body h1 { font-size: 1.15em; }
+  .md-body h2 { font-size: 1.08em; }
+  .md-body h3, .md-body h4 { font-size: 1em; }
+  .md-body ul, .md-body ol { margin: 0.5em 0; padding-left: 1.35em; }
+  .md-body ul { list-style: disc; }
+  .md-body ol { list-style: decimal; }
+  .md-body li { margin: 0.15em 0; }
+  .md-body blockquote {
+    margin: 0.6em 0; padding-left: 0.75em;
+    border-left: 3px solid #cbd5e1; color: #475569;
+  }
+  .md-body code {
+    padding: 0.1em 0.35em; border-radius: 0.3em;
+    background: #f1f5f9; font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .md-body pre {
+    margin: 0.6em 0; padding: 0.75em 0.9em; border-radius: 0.5em;
+    background: #0f172a; color: #e2e8f0; overflow-x: auto;
+    font-size: 0.82em; line-height: 1.6;
+  }
+  .md-body pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+  .md-body a { color: #2563eb; text-decoration: underline; text-underline-offset: 2px; }
+  .md-body a:hover { color: #1d4ed8; }
+  .md-body hr { margin: 0.9em 0; border-color: #e2e8f0; }
+  .md-body table {
+    display: block; max-width: 100%; margin: 0.6em 0;
+    overflow-x: auto; border-collapse: collapse; font-size: 0.9em;
+  }
+  .md-body th, .md-body td { padding: 0.3em 0.65em; border: 1px solid #e2e8f0; }
+  .md-body th { background: #f8fafc; font-weight: 600; }
+  .md-body img { max-width: 100%; border-radius: 0.5em; }
+
+  /* 新消息轻微淡入，避免流式渲染时整块跳动 */
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg-in { animation: msg-in 0.16s ease-out; }
+
+  /* 节点路径箭头 */
+  .node-arrow { color: #cbd5e1; }
+</style>
+<script src="https://registry.npmmirror.com/marked/18.1.1/files/lib/marked.umd.js"></script>
+<script src="https://registry.npmmirror.com/dompurify/3.4.17/files/dist/purify.min.js"></script>
+<script>
+(function () {
+  const root = document.getElementById("playground");
+  const csrf = root.dataset.csrf;
+  const messagesEl = document.getElementById("messages");
+  const input = document.getElementById("input");
+  const composer = document.getElementById("composer");
+  const sendBtn = document.getElementById("send-btn");
+  const stopBtn = document.getElementById("stop-btn");
+  const clearBtn = document.getElementById("clear-btn");
+  const newSessionBtn = document.getElementById("new-session-btn");
+  const statusText = document.getElementById("status-text");
+  const statusDot = document.getElementById("status-dot");
+  const nodeBadge = document.getElementById("node-badge");
+  const sessionBtn = document.getElementById("session-btn");
+  const sessionIdEl = document.getElementById("session-id");
+  const charCount = document.getElementById("char-count");
+  const workdirInput = document.getElementById("workdir");
+  const workdirHint = document.getElementById("workdir-hint");
+  const skillSelect = document.getElementById("skill-select");
+
+  // 当前会话的工作目录（空字符串 = 员工提示词里的默认目录）
+  function currentWorkdir() {
+    return workdirInput ? workdirInput.value.trim() : "";
+  }
+
+  // 本次任务指定的技能（空字符串 = 由员工自行判断）
+  function currentSkill() {
+    return skillSelect ? skillSelect.value : "";
+  }
+
+  // ———加载全部已启用技能：前端直接列出，不需要先挂载给员工 ———
+  async function loadSkills() {
+    if (!skillSelect) return;
+    try {
+      const res = await fetch("/api/skills/summary");
+      if (!res.ok) return;
+      const items = await res.json();
+      const enabled = items.filter(function (s) { return s.enabled; });
+      const selected = skillSelect.value;
+      skillSelect.innerHTML = "";
+      const blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = enabled.length
+        ? "不指定（员工自行判断）"
+        : "暂无启用的技能";
+      skillSelect.appendChild(blank);
+      enabled.forEach(function (s) {
+        const opt = document.createElement("option");
+        opt.value = s.slug;
+        opt.textContent = s.name + "（" + s.slug + "）";
+        opt.title = s.description || s.name;
+        skillSelect.appendChild(opt);
+      });
+      if (selected && enabled.some(function (s) { return s.slug === selected; })) {
+        skillSelect.value = selected;
+      }
+    } catch (e) { /* 技能列表加载失败不影响对话 */ }
+  }
+  loadSkills();
+
+  const emptyTemplate = document.getElementById("empty-hint").outerHTML;
+
+  function newSessionId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "sess_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  let sessionId = newSessionId();
+  let sessionSynced = false;
+  let sessionTitle = "";
+  let history = [];
+  let controller = null;
+  let streaming = false;
+  let stickToBottom = true;
+  let timerId = null;
+  let startedAt = 0;
+
+  function renderSessionId() {
+    sessionIdEl.textContent = sessionId.slice(0, 8);
+    sessionBtn.title = "复制完整会话 ID\n" + sessionId;
+  }
+  renderSessionId();
+
+  // 修改工作目录后立即写回会话表（会话还没创建时，等首次同步一起提交）
+  if (workdirInput) {
+    workdirInput.addEventListener("change", function () {
+      if (!sessionSynced) return;
+      fetch("/api/sessions/" + encodeURIComponent(sessionId), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workdir: currentWorkdir() }),
+      }).then(function (res) {
+        if (!res.ok || !workdirHint) return;
+        workdirHint.classList.remove("hidden");
+        setTimeout(function () { workdirHint.classList.add("hidden"); }, 1500);
+      }).catch(function () { /* 保存失败不影响对话 */ });
+    });
+  }
+
+  // ———滚动跟随：只在用户靠近底部时自动滚动，避免打断阅读 ———
+  messagesEl.addEventListener("scroll", function () {
+    const gap = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+    stickToBottom = gap < 80;
+  });
+
+  function scrollDown(force) {
+    if (force || stickToBottom) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      stickToBottom = true;
+    }
+  }
+
+  function hideEmpty() {
+    const hint = document.getElementById("empty-hint");
+    if (hint) hint.remove();
+  }
+
+  function resetMessages() {
+    messagesEl.innerHTML = emptyTemplate;
+    stickToBottom = true;
+  }
+
+  function formatDuration(ms) {
+    return (ms / 1000).toFixed(ms < 10000 ? 1 : 0) + "s";
+  }
+
+  function startTimer() {
+    startedAt = performance.now();
+    if (timerId) clearInterval(timerId);
+    timerId = setInterval(function () {
+      statusText.textContent = "生成中… " + formatDuration(performance.now() - startedAt);
+    }, 100);
+  }
+
+  function stopTimer() {
+    if (timerId) {
+      clearInterval(timerId);
+      timerId = null;
+    }
+  }
+
+  function setBusy(busy) {
+    streaming = busy;
+    sendBtn.disabled = busy;
+    stopBtn.classList.toggle("hidden", !busy);
+    stopBtn.classList.toggle("inline-flex", busy);
+    if (busy) {
+      startTimer();
+    } else {
+      stopTimer();
+    }
+    statusText.textContent = busy ? "生成中…" : "空闲";
+    statusDot.className = busy
+      ? "h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#3b82f6]"
+      : "h-1.5 w-1.5 flex-shrink-0 rounded-full bg-gray-300";
+  }
+
+  async function copyText(text, btn, okLabel) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (err) { /* 忽略 */ }
+      ta.remove();
+    }
+    if (btn) {
+      const original = btn.dataset.label || btn.textContent;
+      btn.dataset.label = original;
+      btn.textContent = okLabel || "已复制";
+      setTimeout(function () { btn.textContent = original; }, 1200);
+    }
+  }
+
+  function addMessage(role, text) {
+    hideEmpty();
+    const row = document.createElement("div");
+    row.className = "msg-in flex " + (role === "user" ? "justify-end" : "justify-start");
+
+    const bubble = document.createElement("div");
+    bubble.className = role === "user"
+      ? "max-w-[85%] whitespace-pre-wrap break-words rounded-xl bg-[#3b82f6] px-3.5 py-2 text-sm text-white shadow-sm"
+      : "md-body max-w-[85%] break-words rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-[#1e293b]";
+    bubble.textContent = text;
+
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    scrollDown(true);
+    return bubble;
+  }
+
+  // ———一轮助手输出：节点路径 / 思考过程 / 工具调用 / 正文 / 状态摘要 ———
+  function addAssistant() {
+    hideEmpty();
+    const row = document.createElement("div");
+    row.className = "msg-in flex justify-start";
+
+    const col = document.createElement("div");
+    col.className = "flex w-full max-w-[85%] flex-col gap-1.5";
+
+    // 节点路径
+    const nodes = document.createElement("div");
+    nodes.className = "hidden flex-wrap items-center gap-1 text-[11px]";
+
+    // 思考过程
+    const reasoning = document.createElement("details");
+    reasoning.className = "hidden rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900";
+    reasoning.open = true;
+    const reasoningSummary = document.createElement("summary");
+    reasoningSummary.className = "cursor-pointer select-none font-medium text-amber-700";
+    reasoningSummary.textContent = "思考过程";
+    const reasoningBody = document.createElement("div");
+    reasoningBody.className = "thin-scroll mt-1.5 max-h-64 overflow-y-auto whitespace-pre-wrap break-words font-mono leading-relaxed";
+    reasoning.appendChild(reasoningSummary);
+    reasoning.appendChild(reasoningBody);
+
+    // 工具调用
+    const tools = document.createElement("div");
+    tools.className = "hidden flex-col gap-1";
+
+    // 人工审批
+    const approvals = document.createElement("div");
+    approvals.className = "hidden flex-col gap-1.5";
+
+    // 正文
+    const bubble = document.createElement("div");
+    bubble.className = "md-body break-words rounded-xl border border-gray-100 bg-white px-3.5 py-2 text-sm text-[#1e293b]";
+
+    // 本轮统计 + 复制
+    const meta = document.createElement("div");
+    meta.className = "hidden flex-wrap items-center gap-x-3 gap-y-1 px-0.5 text-[11px] text-gray-400";
+    const metaText = document.createElement("span");
+    metaText.className = "tabular-nums";
+    const copyAnswerBtn = document.createElement("button");
+    copyAnswerBtn.type = "button";
+    copyAnswerBtn.dataset.copy = "answer";
+    copyAnswerBtn.className = "rounded px-1 py-0.5 text-[11px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600";
+    copyAnswerBtn.textContent = "复制答复";
+    meta.appendChild(metaText);
+    meta.appendChild(copyAnswerBtn);
+
+    // 状态摘要
+    const stateBox = document.createElement("details");
+    stateBox.className = "hidden rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs text-gray-600";
+    const stateSummary = document.createElement("summary");
+    stateSummary.className = "cursor-pointer select-none font-medium text-gray-500";
+    stateSummary.textContent = "状态摘要";
+    const stateToolbar = document.createElement("div");
+    stateToolbar.className = "mt-1.5 flex justify-end";
+    const copyStateBtn = document.createElement("button");
+    copyStateBtn.type = "button";
+    copyStateBtn.dataset.copy = "state";
+    copyStateBtn.className = "rounded px-1.5 py-0.5 text-[11px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600";
+    copyStateBtn.textContent = "复制 JSON";
+    stateToolbar.appendChild(copyStateBtn);
+    const stateBody = document.createElement("pre");
+    stateBody.className = "thin-scroll mt-1 max-h-80 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] leading-relaxed text-gray-500";
+    stateBox.appendChild(stateSummary);
+    stateBox.appendChild(stateToolbar);
+    stateBox.appendChild(stateBody);
+
+    col.appendChild(nodes);
+    col.appendChild(reasoning);
+    col.appendChild(tools);
+    col.appendChild(approvals);
+    col.appendChild(bubble);
+    col.appendChild(meta);
+    col.appendChild(stateBox);
+    row.appendChild(col);
+    messagesEl.appendChild(row);
+    scrollDown(true);
+
+    return {
+      bubble: bubble,
+      nodes: nodes,
+      nodePath: [],
+      reasoning: reasoning,
+      reasoningSummary: reasoningSummary,
+      reasoningBody: reasoningBody,
+      tools: tools,
+      approvals: approvals,
+      meta: meta,
+      metaText: metaText,
+      copyAnswerBtn: copyAnswerBtn,
+      stateBox: stateBox,
+      stateBody: stateBody,
+      stateSummary: stateSummary,
+      copyStateBtn: copyStateBtn,
+      rawState: null,
+    };
+  }
+
+  function addSystem(text, isError) {
+    hideEmpty();
+    const row = document.createElement("div");
+    row.className = "text-center";
+    const span = document.createElement("span");
+    span.className = isError
+      ? "inline-block rounded-full bg-[#ef4444]/10 px-2.5 py-0.5 text-xs text-[#b91c1c]"
+      : "inline-block rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500";
+    span.textContent = text;
+    row.appendChild(span);
+    messagesEl.appendChild(row);
+    scrollDown();
+  }
+
+  function showNode(node) {
+    nodeBadge.textContent = "正在处理：" + node;
+    nodeBadge.classList.remove("hidden");
+    nodeBadge.classList.add("inline-flex");
+  }
+
+  function hideNode() {
+    nodeBadge.classList.add("hidden");
+    nodeBadge.classList.remove("inline-flex");
+  }
+
+  // ———节点路径：把经过的节点按顺序画成一串小胶囊 ———
+  function paintNodePath(turn) {
+    turn.nodes.innerHTML = "";
+    turn.nodePath.forEach(function (name, index) {
+      if (index > 0) {
+        const arrow = document.createElement("span");
+        arrow.className = "node-arrow";
+        arrow.textContent = "›";
+        turn.nodes.appendChild(arrow);
+      }
+      const chip = document.createElement("span");
+      const isSupervisor = name === "supervisor";
+      chip.className = isSupervisor
+        ? "rounded-full border border-gray-200 bg-white px-2 py-0.5 font-mono text-gray-500"
+        : "rounded-full border border-[#3b82f6]/30 bg-[#3b82f6]/10 px-2 py-0.5 font-mono text-[#1d4ed8]";
+      chip.textContent = name;
+      turn.nodes.appendChild(chip);
+    });
+    turn.nodes.classList.toggle("hidden", turn.nodePath.length === 0);
+    turn.nodes.classList.toggle("flex", turn.nodePath.length > 0);
+  }
+
+  function recordNode(turn, node) {
+    if (!node) return;
+    if (turn.nodePath[turn.nodePath.length - 1] === node) return;
+    turn.nodePath.push(node);
+    turn.nodes.classList.remove("hidden");
+    turn.nodes.classList.add("flex");
+    paintNodePath(turn);
+  }
+
+  function pushHistory(userText, assistantText) {
+    history.push({ role: "user", content: userText });
+    if (assistantText) {
+      history.push({ role: "assistant", content: assistantText });
+    }
+    if (history.length > 50) history = history.slice(-50);
+  }
+
+  // ———把本轮对话同步到会话表：首次 POST，之后 PATCH（无需 token）———
+  function syncSession(userText, replyText) {
+    const sid = sessionId;
+    if (!sessionTitle) sessionTitle = userText.slice(0, 50);
+    const payload = {
+      title: sessionTitle,
+      last_message: (replyText || "").slice(0, 500),
+      message_count: history.length,
+      workdir: currentWorkdir(),
+    };
+    const headers = { "Content-Type": "application/json" };
+
+    async function doSync() {
+      if (!sessionSynced) {
+        const res = await fetch("/api/sessions", {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify(Object.assign({ session_id: sid }, payload)),
+        });
+        if (res.status === 201) {
+          if (sid === sessionId) sessionSynced = true;
+          return;
+        }
+        if (res.status !== 409) return; // 其他失败不影响对话
+        if (sid === sessionId) sessionSynced = true;
+      }
+      const res = await fetch("/api/sessions/" + encodeURIComponent(sid), {
+        method: "PATCH",
+        headers: headers,
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 404 && sid === sessionId) {
+        sessionSynced = false; // 记录被删掉了，下一轮重新创建
+      }
+    }
+
+    doSync().catch(function () { /* 会话同步失败不影响对话 */ });
+  }
+
+  // ———Markdown 渲染：marked 解析 + DOMPurify 过滤，失败时退回纯文本 ———
+  function renderMarkdown(el, text) {
+    if (window.marked && window.DOMPurify) {
+      el.innerHTML = window.DOMPurify.sanitize(
+        window.marked.parse(text, { gfm: true, breaks: true })
+      );
+      el.querySelectorAll("a").forEach(function (a) {
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+      });
+    } else {
+      el.textContent = text;
+    }
+  }
+
+  let renderTimer = null;
+  let lastRenderAt = 0;
+
+  function scheduleRender(el, state) {
+    const paint = function () {
+      lastRenderAt = Date.now();
+      renderMarkdown(el, state.acc);
+      scrollDown();
+    };
+    if (Date.now() - lastRenderAt > 80) {
+      paint();
+      return;
+    }
+    if (renderTimer) return;
+    renderTimer = setTimeout(function () {
+      renderTimer = null;
+      paint();
+    }, 80);
+  }
+
+  function flushRender(el, state) {
+    if (renderTimer) {
+      clearTimeout(renderTimer);
+      renderTimer = null;
+    }
+    renderMarkdown(el, state.acc);
+  }
+
+  function finishTurn(turn, state) {
+    const nodes = turn.nodePath.length;
+    const chars = (state.acc || "").length;
+    turn.metaText.textContent = "耗时 " + formatDuration(performance.now() - state.startedAt)
+      + " · " + nodes + " 个节点 · " + chars + " 字";
+    turn.meta.classList.remove("hidden");
+    turn.meta.classList.add("flex");
+    turn.copyAnswerBtn.disabled = !state.acc;
+    turn.copyAnswerBtn.classList.toggle("opacity-50", !state.acc);
+  }
+
+  // ———一张审批卡片：允许 / 拒绝，全部决定后继续运行 ———
+  function addApprovalCard(turn, state, approval) {
+    turn.approvals.classList.remove("hidden");
+    turn.approvals.classList.add("flex");
+
+    const card = document.createElement("div");
+    card.className = "rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 transition-opacity";
+
+    const head = document.createElement("div");
+    head.className = "flex flex-wrap items-center gap-2 font-medium";
+    const title = document.createElement("span");
+    title.textContent = "需要你确认：";
+    const toolName = document.createElement("span");
+    toolName.className = "rounded bg-white/70 px-1.5 py-0.5 font-mono text-[11px]";
+    toolName.textContent = approval.tool || "工具";
+    head.appendChild(title);
+    head.appendChild(toolName);
+
+    const args = document.createElement("pre");
+    args.className = "thin-scroll mt-1.5 max-h-32 overflow-auto whitespace-pre-wrap break-all rounded bg-white/70 px-2 py-1 font-mono text-[11px] leading-relaxed text-amber-800";
+    let argText = approval.args;
+    try {
+      argText = JSON.stringify(approval.args || {}, null, 2);
+    } catch (e) {
+      argText = String(approval.args || "");
+    }
+    args.textContent = argText;
+
+    const desc = document.createElement("p");
+    desc.className = "mt-1 text-[11px] leading-relaxed text-amber-700";
+    desc.textContent = approval.description || "该操作需要人工确认后才会执行。";
+
+    const actions = document.createElement("div");
+    actions.className = "mt-2 flex flex-wrap items-center gap-2";
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "rounded-md bg-[#16a34a] px-3 py-1 text-[11px] font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40";
+    approveBtn.textContent = "允许执行";
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "rounded-md border border-amber-300 bg-white px-3 py-1 text-[11px] font-medium text-amber-800 transition-colors hover:bg-amber-100 disabled:opacity-40";
+    rejectBtn.textContent = "拒绝";
+    const note = document.createElement("span");
+    note.className = "text-[11px] text-amber-700";
+    actions.appendChild(approveBtn);
+    actions.appendChild(rejectBtn);
+    actions.appendChild(note);
+
+    card.appendChild(head);
+    card.appendChild(args);
+    card.appendChild(desc);
+    card.appendChild(actions);
+    turn.approvals.appendChild(card);
+    scrollDown();
+
+    state.pending[approval.interrupt_id] = true;
+
+    function decide(type) {
+      state.decisions[approval.interrupt_id] = {
+        interrupt_id: approval.interrupt_id,
+        type: type,
+      };
+      approveBtn.disabled = true;
+      rejectBtn.disabled = true;
+      card.classList.add("opacity-70");
+      note.textContent = type === "approve" ? "已允许，等待继续…" : "已拒绝，等待继续…";
+      if (Object.keys(state.decisions).length >= Object.keys(state.pending).length) {
+        resumeApprovals(turn, state);
+      }
+    }
+
+    approveBtn.addEventListener("click", function () { decide("approve"); });
+    rejectBtn.addEventListener("click", function () { decide("reject"); });
+  }
+
+  // ———把审批结果发回服务端，继续同一次运行 ———
+  async function resumeApprovals(turn, state) {
+    if (!state.runId || !state.decisions) return;
+    const decisions = Object.values(state.decisions);
+    if (!decisions.length) return;
+
+    const runId = state.runId;
+    state.pending = {};
+    state.decisions = {};
+    state.paused = false;
+    state.finished = false;
+
+    const rejected = decisions.some(function (d) { return d.type === "reject"; });
+    addSystem(rejected ? "已拒绝，继续处理…" : "已允许，继续执行…", false);
+
+    await streamChat(
+      "/admin/playground/approve",
+      {
+        run_id: runId,
+        session_id: sessionId,
+        decisions: decisions,
+        workdir: currentWorkdir(),
+        skill_slug: currentSkill(),
+      },
+      turn,
+      state
+    );
+  }
+
+  function handleEvent(ev, turn, state) {
+    if (ev.type === "node") {
+      recordNode(turn, ev.node);
+      showNode(ev.node);
+    } else if (ev.type === "reasoning") {
+      turn.reasoning.classList.remove("hidden");
+      if (ev.node && ev.node !== state.reasoningNode) {
+        state.reasoningNode = ev.node;
+        turn.reasoningBody.textContent +=
+          (turn.reasoningBody.textContent ? "\n\n" : "") + "【" + ev.node + "】\n";
+      }
+      turn.reasoningBody.textContent += ev.content || "";
+      state.reasoningChars += (ev.content || "").length;
+      turn.reasoningSummary.textContent = "思考过程 · " + state.reasoningChars + " 字";
+      scrollDown();
+    } else if (ev.type === "token") {
+      // 正文开始后自动收起思考过程，想看时再展开
+      if (!state.collapsedReasoning && state.reasoningChars > 0) {
+        state.collapsedReasoning = true;
+        turn.reasoning.open = false;
+      }
+      state.acc += ev.content || "";
+      scheduleRender(turn.bubble, state);
+    } else if (ev.type === "tool_call") {
+      turn.tools.classList.remove("hidden");
+      turn.tools.classList.add("flex");
+      (ev.tool_calls || []).forEach(function (call) {
+        const chip = document.createElement("div");
+        chip.className = "break-all rounded-lg border border-[#3b82f6]/30 bg-[#3b82f6]/5 px-3 py-1.5 font-mono text-xs text-[#1d4ed8]";
+        let args = call.args;
+        try {
+          args = typeof args === "string" ? args : JSON.stringify(args);
+        } catch (e) {
+          args = String(args);
+        }
+        const name = document.createElement("span");
+        name.className = "font-semibold";
+        name.textContent = call.name || "tool";
+        const argText = document.createElement("span");
+        argText.className = "text-[#2563eb]/80";
+        argText.textContent = " " + (args || "");
+        chip.appendChild(document.createTextNode("🔧 "));
+        chip.appendChild(name);
+        chip.appendChild(argText);
+        turn.tools.appendChild(chip);
+      });
+      scrollDown();
+    } else if (ev.type === "approval_required") {
+      state.paused = true;
+      state.runId = ev.run_id || state.runId;
+      (ev.approvals || []).forEach(function (approval) {
+        addApprovalCard(turn, state, approval);
+      });
+      addSystem("等待你确认后继续", false);
+      hideNode();
+      scrollDown();
+    } else if (ev.type === "state") {
+      turn.rawState = ev.state;
+      turn.stateBox.classList.remove("hidden");
+      turn.stateBody.textContent = JSON.stringify(ev.state, null, 2);
+      const next = ev.state && ev.state.next ? " · next=" + ev.state.next : "";
+      const nodeCount = ev.state && Array.isArray(ev.state.nodes) ? ev.state.nodes.length : 0;
+      turn.stateSummary.textContent = "状态摘要" + next + (nodeCount ? " · " + nodeCount + " 个节点" : "");
+      scrollDown();
+    } else if (ev.type === "done") {
+      if (ev.paused) {
+        // 停在审批上：保留这一轮，等用户点允许 / 拒绝
+        state.paused = true;
+        state.runId = ev.run_id || state.runId;
+        hideNode();
+        return;
+      }
+      state.finished = true;
+      if (ev.content) state.acc = ev.content;
+      if (state.acc) {
+        flushRender(turn.bubble, state);
+      } else {
+        turn.bubble.textContent = "（调度员没有返回内容）";
+      }
+      pushHistory(state.userText, state.acc);
+      syncSession(state.userText, state.acc);
+      finishTurn(turn, state);
+      hideNode();
+      setBusy(false);
+      input.focus();
+      scrollDown();
+    } else if (ev.type === "error") {
+      state.finished = true;
+      if (renderTimer) {
+        clearTimeout(renderTimer);
+        renderTimer = null;
+      }
+      turn.bubble.classList.add("bg-[#ef4444]/10", "border-[#ef4444]/30", "text-[#b91c1c]");
+      turn.bubble.textContent = ev.message || "对话失败";
+      hideNode();
+      setBusy(false);
+      scrollDown();
+    }
+  }
+
+  function autoGrow() {
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 176) + "px";
+    updateCharCount();
+  }
+
+  function updateCharCount() {
+    const n = input.value.length;
+    charCount.textContent = n ? n + " / 20000" : "";
+  }
+
+  // ———通用的 SSE 请求：对话与审批续跑共用同一套解析 ———
+  async function streamChat(url, body, turn, state) {
+    const myController = new AbortController();
+    controller = myController;
+    setBusy(true);
+    hideNode();
+
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRF-Token": csrf,
+        },
+        body: JSON.stringify(body),
+        signal: myController.signal,
+      });
+
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || !contentType.includes("text/event-stream")) {
+        let msg = "请求失败（" + res.status + "）";
+        try {
+          const data = await res.json();
+          msg = data.message || data.detail || msg;
+        } catch (e) { /* 非 JSON 响应 */ }
+        if (res.redirected) msg = "登录已过期，请刷新页面后重新登录";
+        turn.bubble.classList.add("bg-[#ef4444]/10", "border-[#ef4444]/30", "text-[#b91c1c]");
+        turn.bubble.textContent = msg;
+        state.finished = true;
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        if (controller !== myController) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+
+        // SSE 事件以空行分隔，兼容 \n 与 \r\n
+        const parts = buffer.split(/\r?\n\r?\n/);
+        buffer = parts.pop();
+
+        for (const part of parts) {
+          const data = part.split(/\r?\n/)
+            .filter(function (line) { return line.startsWith("data:"); })
+            .map(function (line) { return line.slice(5).trim(); })
+            .join("\n");
+          if (!data) continue;
+          let ev;
+          try {
+            ev = JSON.parse(data);
+          } catch (e) {
+            continue;
+          }
+          handleEvent(ev, turn, state);
+        }
+      }
+
+      if (!state.finished && !state.paused) {
+        if (state.acc) {
+          pushHistory(state.userText, state.acc);
+          syncSession(state.userText, state.acc);
+          flushRender(turn.bubble, state);
+          finishTurn(turn, state);
+        }
+        hideNode();
+        setBusy(false);
+      }
+    } catch (err) {
+      // 会话已被清空或切换：忽略旧请求的收尾，避免污染新对话
+      if (controller !== myController) {
+        return;
+      }
+      if (err && err.name === "AbortError") {
+        if (state.acc) {
+          pushHistory(state.userText, state.acc);
+          syncSession(state.userText, state.acc);
+          flushRender(turn.bubble, state);
+          finishTurn(turn, state);
+        } else {
+          turn.bubble.textContent = "已停止";
+        }
+        addSystem("已停止生成", false);
+      } else {
+        turn.bubble.classList.add("bg-[#ef4444]/10", "border-[#ef4444]/30", "text-[#b91c1c]");
+        turn.bubble.textContent = (err && err.message) || "网络错误";
+      }
+      hideNode();
+      setBusy(false);
+    } finally {
+      if (controller === myController) controller = null;
+      scrollDown();
+      input.focus();
+    }
+  }
+
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text || streaming) return;
+
+    input.value = "";
+    autoGrow();
+    addMessage("user", text);
+    const turn = addAssistant();
+    const state = {
+      acc: "",
+      finished: false,
+      paused: false,
+      runId: null,
+      pending: {},
+      decisions: {},
+      userText: text,
+      reasoningNode: null,
+      reasoningChars: 0,
+      collapsedReasoning: false,
+      startedAt: performance.now(),
+    };
+    scrollDown(true);
+
+    await streamChat(
+      "/admin/playground/stream",
+      {
+        message: text,
+        history: history,
+        session_id: sessionId,
+        workdir: currentWorkdir(),
+        skill_slug: currentSkill(),
+      },
+      turn,
+      state
+    );
+  }
+
+  // 示例提示：填入输入框而不是直接发送
+  messagesEl.addEventListener("click", function (e) {
+    const btn = e.target.closest(".example-btn");
+    if (!btn) return;
+    input.value = btn.dataset.prompt || btn.textContent;
+    autoGrow();
+    input.focus();
+  });
+
+  composer.addEventListener("submit", function (e) {
+    e.preventDefault();
+    sendMessage();
+  });
+
+  input.addEventListener("input", autoGrow);
+  input.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // 生成中按 Esc 停止
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && streaming && controller) {
+      controller.abort();
+    }
+  });
+
+  stopBtn.addEventListener("click", function () {
+    if (controller) controller.abort();
+  });
+
+  sessionBtn.addEventListener("click", function () {
+    copyText(sessionId, null);
+    const original = sessionIdEl.textContent;
+    sessionIdEl.textContent = "已复制";
+    setTimeout(function () {
+      sessionIdEl.textContent = original;
+    }, 1200);
+  });
+
+  function resetConversation(makeNewSession) {
+    if (streaming && controller) {
+      const old = controller;
+      controller = null;
+      old.abort();
+    }
+    history = [];
+    sessionSynced = false;
+    sessionTitle = "";
+    if (makeNewSession) {
+      sessionId = newSessionId();
+      renderSessionId();
+      // 工作目录和技能都属于本次会话：新会话回到默认值
+      if (workdirInput) workdirInput.value = "";
+      if (skillSelect) skillSelect.value = "";
+    }
+    resetMessages();
+    hideNode();
+    setBusy(false);
+    if (workdirHint) workdirHint.classList.add("hidden");
+    input.focus();
+  }
+
+  newSessionBtn.addEventListener("click", function () {
+    resetConversation(true);
+  });
+
+  clearBtn.addEventListener("click", function () {
+    resetConversation(false);
+  });
+
+  // 复制答复 / 复制 state
+  messagesEl.addEventListener("click", function (e) {
+    const btn = e.target.closest("button[data-copy]");
+    if (!btn) return;
+    if (btn.dataset.copy === "answer") {
+      const row = btn.closest(".msg-in");
+      const bubble = row && row.querySelector(".md-body");
+      if (bubble) copyText(bubble.innerText, btn);
+    } else if (btn.dataset.copy === "state") {
+      const box = btn.closest("details");
+      const pre = box && box.querySelector("pre");
+      if (pre) copyText(pre.textContent, btn);
+    }
+  });
+
+  autoGrow();
+  input.focus();
+})();
+</script>
+{% endblock %}

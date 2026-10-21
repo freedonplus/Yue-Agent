@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}管理后台{% endblock %} · {{ app_name }}</title>
+  <link rel="preconnect" href="https://registry.npmmirror.com" crossorigin>
+  <link rel="stylesheet" href="https://registry.npmmirror.com/misans/5.0.0/files/lib/Normal/MiSansVF.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            canvas: "#f1f5f9",
+            ink: "#1e293b",
+            brand: "#3b82f6",
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    html, body { height: 100%; }
+    body {
+      background: #f1f5f9;
+      color: #1e293b;
+      font-family: "MiSans VF", MiSans, "HarmonyOS Sans SC", "PingFang SC",
+                   "Source Han Sans SC", "Noto Sans SC", "Microsoft YaHei",
+                   ui-sans-serif, system-ui, sans-serif;
+      font-feature-settings: "kern" 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      /* 中文断行：不让标点、括号被拆到行首/行尾 */
+      line-break: strict;
+      overflow-wrap: break-word;
+    }
+    /* 标题尽量整行均衡，正文避免孤字成行 */
+    h1, h2, h3 { text-wrap: balance; }
+    p, li, dd { text-wrap: pretty; }
+    /* 按钮、表头、行内短标签保持整块，不拆字换行 */
+    button,
+    a[class~="inline-flex"],
+    th,
+    .no-break { white-space: nowrap; }
+    /* 圣杯布局：三列等高、页脚贴底 */
+    .grail-body { min-height: 100vh; }
+    .grail-main { min-width: 0; }
+    .grail-side { align-self: stretch; }
+    /* 尊重系统减弱动效设置 */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+      }
+    }
+    /* 细滚动条，避免侧栏出现粗重控件 */
+    .thin-scroll { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    .thin-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+  </style>
+</head>
+<body class="grail-body flex flex-col">
+
+  {# —————————页头：sticky 固定顶部———————— #}
+  <header class="sticky top-0 z-50 bg-white border-b border-gray-200">
+    <div class="flex h-14 items-center gap-3 px-4 md:px-6">
+      <a href="/admin/roles" class="flex flex-shrink-0 items-center gap-2 whitespace-nowrap font-semibold tracking-tight text-base md:text-lg">
+        <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#3b82f6] text-white text-xs font-semibold">Y</span>
+        <span>{{ app_name }}</span>
+        <span class="hidden sm:inline text-xs font-normal text-gray-400">管理后台</span>
+      </a>
+
+      <div class="flex-1"></div>
+
+      <span class="hidden whitespace-nowrap sm:inline text-xs text-gray-600">{{ username }}</span>
+      <form method="post" action="/admin/logout" class="m-0">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit"
+                class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-colors duration-150 ease-out bg-gray-100 text-gray-700 px-3 py-1.5 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.25)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+          退出
+        </button>
+      </form>
+    </div>
+
+    {# —————————小屏导航：<768px 侧栏折叠后从这里进入———————— #}
+    <nav class="md:hidden border-t border-gray-100 px-4">
+      <div class="flex gap-2 py-2 overflow-x-auto">
+        <a href="/admin/roles"
+           class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out {% if active == 'roles' %}bg-[#3b82f6]/10 text-[#3b82f6]{% else %}text-gray-600 hover:bg-gray-50{% endif %}">
+          角色
+        </a>
+        <a href="/admin/tools"
+           class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out {% if active == 'tools' %}bg-[#3b82f6]/10 text-[#3b82f6]{% else %}text-gray-600 hover:bg-gray-50{% endif %}">
+          工具
+        </a>
+        <a href="/admin/skills"
+           class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out {% if active == 'skills' %}bg-[#3b82f6]/10 text-[#3b82f6]{% else %}text-gray-600 hover:bg-gray-50{% endif %}">
+          技能
+        </a>
+        <a href="/admin/providers"
+           class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out {% if active == 'providers' %}bg-[#3b82f6]/10 text-[#3b82f6]{% else %}text-gray-600 hover:bg-gray-50{% endif %}">
+          厂商
+        </a>
+        <a href="/admin/sessions"
+           class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out {% if active == 'sessions' %}bg-[#3b82f6]/10 text-[#3b82f6]{% else %}text-gray-600 hover:bg-gray-50{% endif %}">
+          会话
+        </a>
+        <a href="/admin/playground"
+           class="rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out {% if active == 'playground' %}bg-[#3b82f6]/10 text-[#3b82f6]{% else %}text-gray-600 hover:bg-gray-50{% endif %}">
+          测试
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  {# —————————三列区域：主内容在源码中先于侧栏———————— #}
+  <div class="flex flex-1">
+
+    {# —————————主内容：flex-1 自适应———————— #}
+    <main class="grail-main order-1 md:order-2 flex-1 px-4 md:px-6 py-4 md:py-6">
+      {% if msg %}
+      <div class="mb-4 rounded-xl border border-[#10b981]/30 bg-[#10b981]/10 px-4 py-3 text-sm text-[#0f7f5c]" role="status">
+        {{ msg }}
+      </div>
+      {% endif %}
+      {% if err %}
+      <div class="mb-4 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-sm text-[#b91c1c]" role="alert">
+        {{ err }}
+      </div>
+      {% endif %}
+
+      {% block main %}{% endblock %}
+    </main>
+
+    {# —————————左侧导航：固定宽度 w-60，<768px 折叠———————— #}
+    <aside class="grail-side grail-left order-2 md:order-1 hidden md:flex md:w-60 flex-shrink-0 flex-col bg-white border-r border-gray-200">
+      <nav class="flex-1 py-4 thin-scroll" aria-label="后台导航">
+        <div class="px-4 pb-2 text-xs font-medium text-gray-400">管理</div>
+
+        <a href="/admin/roles"
+           class="flex items-center gap-3 border-l-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out
+                  {% if active == 'roles' %}border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]{% else %}border-transparent text-gray-600 hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#1e293b]{% endif %}">
+          <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke-linecap="round"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke-linecap="round"/>
+          </svg>
+          角色管理
+        </a>
+
+        <a href="/admin/tools"
+           class="flex items-center gap-3 border-l-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out
+                  {% if active == 'tools' %}border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]{% else %}border-transparent text-gray-600 hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#1e293b]{% endif %}">
+          <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.3-2.3 2.3-2.3z" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          工具管理
+        </a>
+
+        <a href="/admin/skills"
+           class="flex items-center gap-3 border-l-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out
+                  {% if active == 'skills' %}border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]{% else %}border-transparent text-gray-600 hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#1e293b]{% endif %}">
+          <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" stroke-linejoin="round"/>
+            <path d="M9 7h7M9 11h7" stroke-linecap="round"/>
+          </svg>
+          技能管理
+        </a>
+
+        <a href="/admin/providers"
+           class="flex items-center gap-3 border-l-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out
+                  {% if active == 'providers' %}border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]{% else %}border-transparent text-gray-600 hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#1e293b]{% endif %}">
+          <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="7" rx="2"/>
+            <rect x="3" y="13" width="18" height="7" rx="2"/>
+            <path d="M7 7.5h.01M7 16.5h.01" stroke-linecap="round"/>
+          </svg>
+          厂商管理
+        </a>
+
+        <a href="/admin/sessions"
+           class="flex items-center gap-3 border-l-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out
+                  {% if active == 'sessions' %}border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]{% else %}border-transparent text-gray-600 hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#1e293b]{% endif %}">
+          <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.3 9.3 0 0 1-3.8-.8L3 21l1.9-5.2A8.4 8.4 0 0 1 4 11.5 8.4 8.4 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 10h7M8.5 13.5h4.5" stroke-linecap="round"/>
+          </svg>
+          会话管理
+        </a>
+
+        <div class="mt-6 px-4 pb-2 text-xs font-medium text-gray-400">调试</div>
+        <a href="/admin/playground"
+           class="flex items-center gap-3 border-l-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150 ease-out
+                  {% if active == 'playground' %}border-[#3b82f6] bg-[#3b82f6]/10 text-[#3b82f6]{% else %}border-transparent text-gray-600 hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#1e293b]{% endif %}">
+          <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M9 3h6M10 3v5.5L5.5 17a3 3 0 0 0 2.7 4h7.6a3 3 0 0 0 2.7-4L14 8.5V3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M7.5 14h9" stroke-linecap="round"/>
+          </svg>
+          测试对话
+        </a>
+
+        <div class="mt-6 px-4 pb-2 text-xs font-medium text-gray-400">接口</div>
+        <a href="/docs" target="_blank" rel="noopener"
+           class="flex items-center gap-3 border-l-2 border-transparent px-4 py-2.5 text-sm font-medium text-gray-600 transition-colors duration-150 ease-out hover:border-[#3b82f6] hover:bg-gray-50 hover:text-[#1e293b]">
+          <svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-linejoin="round"/>
+            <path d="M14 2v6h6M8 13h8M8 17h5" stroke-linecap="round"/>
+          </svg>
+          API 文档
+        </a>
+      </nav>
+
+      <div class="border-t border-gray-100 px-4 py-3 text-xs text-gray-400">
+        唯一调度员由系统锁定
+      </div>
+    </aside>
+
+    {# —————————右侧边栏：固定宽度 w-64，<1024px 隐藏———————— #}
+    <aside class="grail-side hidden lg:block w-64 flex-shrink-0 bg-white border-l border-gray-200">
+      <div class="p-4 md:p-6">
+        {% block side %}{% endblock %}
+      </div>
+    </aside>
+  </div>
+
+  {# —————————页脚：sticky 固定底部———————— #}
+  <footer class="sticky bottom-0 z-40 border-t border-gray-200 bg-white px-4 md:px-6 py-3">
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-600">
+      <span class="whitespace-nowrap">{{ app_name }} · 管理后台</span>
+      <span class="whitespace-nowrap text-gray-400">仅限管理员访问 · 数据变更即时生效</span>
+    </div>
+  </footer>
+
+  {# —————————页面级脚本：不占用布局结构———————— #}
+  {% block tail %}{% endblock %}
+</body>
+</html>

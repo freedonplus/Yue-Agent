@@ -1,0 +1,312 @@
+/* ============================================================
+   Comic Style Tokens —— Yue Agent 桌面端全局样式
+   墨线边框 / 硬边阴影 / 半调网点 / 对话气泡 / 夸张交互
+   ============================================================ */
+
+:root {
+  /* 配色 */
+  --ink: #1a1a1a;        /* 墨线、正文 */
+  --paper: #fffef0;      /* 面板背景（米白） */
+  --panel: #ffffff;      /* 卡片内底 */
+  --red: #ff3333;        /* 动作、CTA */
+  --yellow: #ffcc00;     /* 标签、高亮 */
+  --blue: #3366ff;       /* 信息、链接 */
+  --green: #33cc33;      /* 成功 */
+  --muted: #4a4a4a;      /* 弱化正文 */
+
+  --line: 4px;           /* 墨线宽度 */
+  --shadow: 6px 6px 0 0 var(--ink);       /* 硬边阴影（大） */
+  --shadow-sm: 4px 4px 0 0 var(--ink);    /* 硬边阴影（中） */
+  --shadow-xs: 3px 3px 0 0 var(--ink);    /* 硬边阴影（小） */
+  --shadow-hover: 10px 10px 0 0 var(--ink);
+
+  --font: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --mono: "Cascadia Code", "Consolas", "JetBrains Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font);
+  background-color: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 半调网点背景（页面级） */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(circle, rgba(26,26,26,0.08) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+#app { position: relative; z-index: 1; }
+
+/* ---------- 字体工具 ---------- */
+.comic-title {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+}
+.comic-text { font-weight: 700; }
+.comic-muted { color: var(--muted); font-weight: 700; }
+
+/* ---------- 卡片：墨线 + 硬阴影 ---------- */
+.c-card {
+  background: var(--panel);
+  border: var(--line) solid var(--ink);
+  box-shadow: var(--shadow);
+  border-radius: 0;               /* 漫画风：直角，非对话气泡 */
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.c-card--paper { background: var(--paper); }
+
+/* ---------- 按钮：夸张弹出 ---------- */
+.c-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  user-select: none;
+  border: var(--line) solid var(--ink);
+  border-radius: 0;
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.1s, box-shadow 0.1s, background-color 0.1s, color 0.1s;
+  position: relative;
+  overflow: hidden;
+}
+/* 半调网点：group-hover 浮现 */
+.c-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s;
+  background-image: radial-gradient(circle, rgba(26,26,26,0.35) 1px, transparent 1px);
+  background-size: 5px 5px;
+}
+.c-btn:hover { transform: scale(1.08) rotate(-3deg); box-shadow: var(--shadow-hover); }
+.c-btn:hover::before { opacity: 0.18; }
+.c-btn:active {
+  transform: translate(4px, 4px);
+  box-shadow: none;
+}
+.c-btn:focus-visible {
+  outline: 3px dashed var(--ink);
+  outline-offset: 3px;
+}
+
+.c-btn--red { background: var(--red); color: #fff; }
+.c-btn--blue { background: var(--blue); color: #fff; }
+.c-btn--green { background: var(--green); color: #fff; }
+.c-btn--white { background: #fff; color: var(--ink); }
+.c-btn--dark { background: var(--ink); color: #fff; }
+.c-btn--ghost { background: transparent; color: var(--ink); box-shadow: none; }
+.c-btn--ghost:hover { background: var(--yellow); transform: scale(1.06) rotate(-2deg); box-shadow: var(--shadow-sm); }
+.c-btn--sm { padding: 6px 12px; font-size: 12px; }
+.c-btn--lg { padding: 14px 28px; font-size: 16px; }
+.c-btn--block { display: flex; width: 100%; }
+.c-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: var(--shadow-xs);
+}
+.c-btn:disabled:hover { box-shadow: var(--shadow-xs); transform: none; }
+
+/* ---------- 输入框 ---------- */
+.c-input, .c-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  background: #fff;
+  border: var(--line) solid var(--ink);
+  border-radius: 0;
+  box-shadow: 2px 2px 0 0 var(--ink);
+  transition: box-shadow 0.1s, transform 0.1s;
+}
+.c-input:focus, .c-textarea:focus {
+  outline: none;
+  box-shadow: var(--shadow-sm);
+  transform: translate(-1px, -1px);
+}
+.c-input::placeholder, .c-textarea::placeholder { color: #9c9c8a; font-weight: 700; }
+.c-input--dark { background: var(--paper); }
+
+/* ---------- 标签 ---------- */
+.c-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  background: var(--yellow);
+  color: var(--ink);
+}
+.c-tag--red { background: var(--red); color: #fff; }
+.c-tag--blue { background: var(--blue); color: #fff; }
+.c-tag--green { background: var(--green); color: #fff; }
+.c-tag--dark { background: var(--ink); color: #fff; }
+.c-tag--white { background: #fff; color: var(--ink); }
+
+/* ---------- 对话气泡（唯一允许圆角） ---------- */
+.c-bubble {
+  position: relative;
+  max-width: 78%;
+  padding: 12px 16px;
+  border: var(--line) solid var(--ink);
+  border-radius: 18px;
+  box-shadow: var(--shadow-sm);
+  font-weight: 500;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.c-bubble--user {
+  background: var(--yellow);
+  align-self: flex-end;
+}
+.c-bubble--user::after {
+  content: "";
+  position: absolute;
+  right: -10px;
+  bottom: 14px;
+  width: 0; height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 12px solid var(--ink);
+}
+.c-bubble--bot {
+  background: #fff;
+  align-self: flex-start;
+}
+.c-bubble--bot::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  bottom: 14px;
+  width: 0; height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 12px solid var(--ink);
+}
+
+/* ---------- 半调网点装饰层 ---------- */
+.halftone {
+  background-image: radial-gradient(circle, rgba(26,26,26,0.14) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+
+/* ---------- 动作线（速度线） ---------- */
+.speed-lines {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 12px,
+    rgba(26,26,26,0.06) 12px 13px
+  );
+}
+
+/* ---------- 状态徽章：脉冲点 ---------- */
+.c-dot {
+  width: 12px; height: 12px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  display: inline-block;
+}
+.c-dot--online { background: var(--green); animation: pulse 1.2s infinite; }
+.c-dot--offline { background: var(--muted); }
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+
+/* ---------- 弹出标签（group-hover 从 scale-0 弹出） ---------- */
+.c-pop-tag {
+  transform: scale(0);
+  transition: transform 0.12s;
+  display: inline-block;
+}
+.group:hover .c-pop-tag, .group:focus-within .c-pop-tag { transform: scale(1); }
+
+/* ---------- 滚动条（全局，漫画风） ---------- */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--paper); border-left: 2px solid var(--ink); }
+::-webkit-scrollbar-thumb {
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  min-height: 48px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--red); }
+
+/* ---------- 布局辅助 ---------- */
+.stack { display: flex; flex-direction: column; }
+.row { display: flex; align-items: center; }
+.gap-1 { gap: 4px; } .gap-2 { gap: 8px; } .gap-3 { gap: 12px; } .gap-4 { gap: 16px; }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1; min-width: 0; }
+.spacer { flex: 1; }
+.text-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 面板标题（漫画分镜式） */
+.c-section-title {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.c-section-title::before {
+  content: "";
+  width: 18px; height: 18px;
+  background: var(--red);
+  border: 3px solid var(--ink);
+  transform: rotate(8deg);
+}
+
+/* 加载中的漫画扫描线 */
+.c-loading {
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  animation: blink 1s steps(2) infinite;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* 过渡入场 */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.12s, transform 0.12s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(6px); }
+
+/* 无障碍：尊重减少动效 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

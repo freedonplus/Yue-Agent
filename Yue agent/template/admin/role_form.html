@@ -1,0 +1,503 @@
+{% extends "admin/base.html" %}
+{% set active = 'roles' %}
+{% block title %}{{ "编辑角色" if mode == "edit" else "新建角色" }}{% endblock %}
+
+{% block main %}
+{% set input_cls = "w-full bg-gray-50 border border-gray-200 rounded-lg px-3.5 py-2.5 text-sm text-[#1e293b] placeholder-gray-400 transition-all duration-150 ease-out focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:border-transparent" %}
+
+<div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+  <div>
+    <a href="/admin/roles" class="text-xs text-gray-500 transition-colors duration-150 ease-out hover:text-[#3b82f6]">← 返回角色列表</a>
+    <h1 class="mt-1 text-xl md:text-2xl font-semibold text-[#1e293b]">
+      {{ "编辑角色" if mode == "edit" else "新建角色" }}
+    </h1>
+    <p class="mt-1 text-sm text-gray-600">系统只允许一个调度员，创建第二个会被拒绝。</p>
+  </div>
+</div>
+
+<div class="max-w-4xl bg-white rounded-xl shadow-sm border border-gray-100 p-4 md:p-6">
+  {% if errors %}
+  <div class="mb-5 rounded-xl border border-[#ef4444]/30 bg-[#ef4444]/10 px-4 py-3 text-sm text-[#b91c1c]" role="alert">
+    <ul class="list-disc pl-4 space-y-1">
+      {% for e in errors %}<li>{{ e }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <form method="post" id="role_form"
+        action="{{ '/admin/roles/' ~ role_id ~ '/edit' if mode == 'edit' else '/admin/roles' }}"
+        class="space-y-5">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="tool_selection" id="tool_selection" value="">
+    <input type="hidden" name="approval_tools" id="approval_tools" value="">
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label for="slug" class="mb-1.5 block text-sm font-medium text-gray-700">slug</label>
+        <input id="slug" type="text" name="slug" value="{{ form.slug }}"
+               pattern="[a-z0-9][a-z0-9_-]*" maxlength="50" required
+               class="{{ input_cls }}">
+        <p class="mt-1.5 text-xs text-gray-500">小写字母、数字、下划线或短横线，全局唯一</p>
+      </div>
+      <div>
+        <label for="name" class="mb-1.5 block text-sm font-medium text-gray-700">名称</label>
+        <input id="name" type="text" name="name" value="{{ form.name }}" maxlength="100" required
+               class="{{ input_cls }}">
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label for="role" class="mb-1.5 block text-sm font-medium text-gray-700">角色</label>
+        {% if is_supervisor %}
+        <input id="role" type="text" value="调度员（不可修改）" disabled
+               class="{{ input_cls }} cursor-not-allowed text-gray-500">
+        <input type="hidden" name="role" value="supervisor">
+        {% else %}
+        <select id="role" name="role" class="{{ input_cls }}">
+          <option value="worker" {% if form.role == "worker" %}selected{% endif %}>员工</option>
+          <option value="supervisor" {% if form.role == "supervisor" %}selected{% endif %}>调度员</option>
+        </select>
+        {% endif %}
+      </div>
+      <div>
+        <label for="provider_id" class="mb-1.5 block text-sm font-medium text-gray-700">绑定厂商</label>
+        <select id="provider_id" name="provider_id" class="{{ input_cls }}">
+          <option value="">— 不绑定 —</option>
+          {% for p in providers %}
+          <option value="{{ p.id }}" {% if form.provider_id == p.id %}selected{% endif %}>
+            {{ p.name }}（{{ p.slug }}）
+          </option>
+          {% endfor %}
+        </select>
+        <p class="mt-1.5 text-xs text-gray-500">员工未绑定时可在运行时使用默认厂商</p>
+      </div>
+    </div>
+
+    <div>
+      <label for="description" class="mb-1.5 block text-sm font-medium text-gray-700">描述</label>
+      <input id="description" type="text" name="description" value="{{ form.description }}"
+             class="{{ input_cls }}">
+    </div>
+
+    {% if not is_supervisor %}
+    <div>
+      <div class="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <span class="block text-sm font-medium text-gray-700">挂载工具</span>
+        <a href="/admin/tools" class="text-xs text-[#3b82f6] transition-colors duration-150 ease-out hover:underline">管理工具 →</a>
+      </div>
+      {% if tools %}
+      <div id="tool_cards" class="space-y-2">
+        {% for t in tools %}
+        {% set mounted = t.id in selected_tool_ids %}
+        {% set chosen = tool_selection.get(t.id) %}
+        {% set avail = tool_available.get(t.id) or [] %}
+        <div data-tool-config class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 transition-colors duration-150 ease-out hover:border-[#3b82f6]/40 hover:bg-white">
+          <div class="flex items-start gap-2.5">
+            <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-2.5">
+              <input type="checkbox" name="tool_ids" value="{{ t.id }}" class="mount-toggle mt-0.5 h-4 w-4 flex-shrink-0 rounded border-gray-300 text-[#3b82f6] transition-colors duration-150 ease-out focus:ring-2 focus:ring-[#3b82f6]"
+                     {% if mounted %}checked{% endif %}>
+              <span class="min-w-0 flex-1">
+                <span class="flex flex-wrap items-center gap-1.5 text-sm font-medium text-[#1e293b]">
+                  {{ t.name }}
+                  {% if not t.enabled %}
+                  <span class="inline-flex items-center rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">已停用</span>
+                  {% endif %}
+                  {% if avail %}
+                  <span class="tool-count-badge inline-flex items-center rounded-full bg-[#3b82f6]/10 px-2 py-0.5 text-[10px] font-medium text-[#3b82f6]">{{ avail|length }} 个工具</span>
+                  {% else %}
+                  <span class="tool-count-badge inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-medium text-gray-500">未拉取</span>
+                  {% endif %}
+                </span>
+                <span class="mt-0.5 block font-mono text-[11px] text-gray-400">{{ t.slug }}</span>
+                {% if t.description %}
+                <span class="mt-0.5 block text-xs leading-relaxed text-gray-600">{{ t.description }}</span>
+                {% endif %}
+              </span>
+            </label>
+          </div>
+
+          <div class="tool-choice-area">
+            {% if avail %}
+            <details class="tool-choices mt-2 pl-6" {% if mounted and chosen is not none %}open{% endif %}>
+              <summary class="cursor-pointer select-none text-xs font-medium text-[#3b82f6]">
+                选择具体工具
+                <span class="font-normal text-gray-500">
+                  （默认全选{% if chosen is not none %}，当前已限制为 {{ chosen|length }} 个{% endif %}）
+                </span>
+              </summary>
+              <div class="mt-2 grid gap-1.5 md:grid-cols-2">
+                {% for item in avail %}
+                <div data-tool-choice class="flex items-start gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5">
+                  <label class="flex min-w-0 flex-1 cursor-pointer items-start gap-2">
+                    <input type="checkbox" class="tool-choice mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded border-gray-300 text-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]"
+                           value="{{ item.name }}" data-tool-id="{{ t.id }}"
+                           {% if chosen is none or item.name in chosen %}checked{% endif %}>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate font-mono text-[11px] text-gray-700" title="{{ item.name }}">{{ item.name }}</span>
+                      {% if item.description %}
+                      <span class="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-gray-500" title="{{ item.description }}">{{ item.description }}</span>
+                      {% endif %}
+                    </span>
+                  </label>
+                  <span class="flex flex-shrink-0 items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700"
+                        title="勾选后，这个工具每次执行前都要人工确认">
+                    <input type="checkbox" class="tool-approval h-3 w-3 flex-shrink-0 cursor-pointer rounded border-amber-300 text-amber-500 focus:ring-2 focus:ring-amber-400"
+                           value="{{ item.name }}" data-tool-id="{{ t.id }}"
+                           {% if item.name in selected_approval_tools %}checked{% endif %}>
+                    审批
+                  </span>
+                </div>
+                {% endfor %}
+              </div>
+            </details>
+            {% else %}
+            <p class="tool-unpulled mt-2 pl-6 text-xs text-gray-500">
+              还没拉取工具清单；勾选挂载时默认使用该配置下的全部工具。
+              <button type="button" data-tool-id="{{ t.id }}"
+                      class="tool-probe font-medium text-[#3b82f6] hover:underline">立即拉取 →</button>
+            </p>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div id="tool_pager" class="mt-3 hidden flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600"></div>
+      <p class="mt-1.5 text-xs text-gray-500">只勾选这个员工真正需要的能力；停用的工具不会被加载</p>
+      {% else %}
+      <div class="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-3 py-4 text-center">
+        <p class="text-xs text-gray-500">还没有工具。</p>
+        <a href="/admin/tools/new" class="mt-1 inline-block text-xs font-medium text-[#3b82f6] hover:underline">先去创建 →</a>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div>
+      <label for="system_prompt" class="mb-1.5 block text-sm font-medium text-gray-700">系统提示词</label>
+      <textarea id="system_prompt" name="system_prompt" required rows="10"
+                class="{{ input_cls }} leading-relaxed">{{ form.system_prompt }}</textarea>
+      <p class="mt-1.5 text-xs text-gray-500">这个角色的职责、边界和输出要求</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+      <div>
+        <label for="sort_order" class="mb-1.5 block text-sm font-medium text-gray-700">排序</label>
+        <input id="sort_order" type="number" name="sort_order" value="{{ form.sort_order }}" min="0"
+               class="{{ input_cls }}">
+      </div>
+      <div>
+        <span class="mb-1.5 block text-sm font-medium text-gray-700">状态</span>
+        <label class="inline-flex items-center gap-2 pt-2 text-sm text-gray-700">
+          <input id="enabled" type="checkbox" name="enabled" value="1"
+                 {% if form.enabled %}checked{% endif %}
+                 {% if is_supervisor %}disabled{% endif %}
+                 class="h-4 w-4 rounded border-gray-300 text-[#3b82f6] transition-colors duration-150 ease-out focus:ring-2 focus:ring-[#3b82f6]">
+          启用
+        </label>
+        {% if is_supervisor %}
+        <input type="hidden" name="enabled" value="1">
+        <p class="mt-1.5 text-xs text-gray-500">唯一调度员不可停用</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if not is_supervisor %}
+    <div class="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-3">
+      <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input id="is_output_gate" type="checkbox" name="is_output_gate" value="1"
+               {% if form.is_output_gate %}checked{% endif %}
+               class="h-4 w-4 rounded border-gray-300 text-[#3b82f6] transition-colors duration-150 ease-out focus:ring-2 focus:ring-[#3b82f6]">
+        作为最终输出管卡
+      </label>
+      <p class="mt-1.5 text-xs text-gray-500">
+        其他员工完成任务后，先把结果交给这个员工，由 TA 用自己的身份、语气和排版整理成最终答复。
+        全局只能启用一个；用户直接找 TA 时按普通员工处理。
+      </p>
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-5">
+      <button type="submit"
+              class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-[#3b82f6] text-white px-4 py-2 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.4)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+        保存
+      </button>
+      <a href="/admin/roles"
+         class="inline-flex items-center justify-center rounded-lg font-medium text-sm transition-all duration-150 ease-out bg-white text-gray-700 border border-gray-200 px-4 py-2 hover:bg-gray-50 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(59,130,246,0.15)] active:scale-[0.98] active:translate-y-0 active:shadow-none focus:outline-none focus:ring-2 focus:ring-[#3b82f6] focus:ring-offset-2">
+        取消
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block side %}
+<div class="rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">填写提示</h2>
+  <ul class="mt-3 space-y-2 text-xs text-gray-600 list-disc pl-4">
+    <li>slug 用于内部引用，创建后尽量不要再改。</li>
+    <li>系统提示词越具体，员工行为越稳定。</li>
+    <li>只有一位调度员时，建议命名为「调度员」并绑定默认厂商。</li>
+    <li>停用的角色不会出现在公开接口中。</li>
+  </ul>
+</div>
+
+<div class="mt-4 rounded-xl border border-[#3b82f6]/20 bg-[#3b82f6]/5 p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">唯一调度员</h2>
+  <p class="mt-1.5 text-xs text-gray-600">
+    调度员的角色与启用状态被锁定；如需更换，只能编辑原调度员的配置。
+  </p>
+</div>
+
+<div class="mt-4 rounded-xl border border-gray-100 bg-white p-4">
+  <h2 class="text-sm font-semibold text-[#1e293b]">工具挂载</h2>
+  <ul class="mt-3 space-y-2 text-xs text-gray-600 list-disc pl-4">
+    <li>勾选配置表示把这个 MCP 服务挂给员工。</li>
+    <li>展开「选择具体工具」可以只开放部分工具。</li>
+    <li>还没拉取清单时，默认挂载该配置下的全部工具。</li>
+    <li>勾选工具右侧的「审批」，该工具每次执行前都会暂停，等你在对话页确认。</li>
+  </ul>
+</div>
+
+{% endblock %}
+
+{% block tail %}
+<script>
+  (function () {
+    const form = document.getElementById('role_form');
+    const hidden = document.getElementById('tool_selection');
+    const approvalHidden = document.getElementById('approval_tools');
+    if (!form || !hidden) return;
+
+    const csrfInput = form.querySelector('input[name="csrf"]');
+    const csrf = csrfInput ? csrfInput.value : '';
+    const PAGE_SIZE = 6;
+
+    function el(tag, cls) {
+      const node = document.createElement(tag);
+      if (cls) node.className = cls;
+      return node;
+    }
+
+    // ———单张配置卡：勾选状态与审批联动；动态拉取后也可重复调用 ———
+    function syncCard(box) {
+      const mount = box.querySelector('.mount-toggle');
+      if (!mount) return;
+      const choices = Array.from(box.querySelectorAll('.tool-choice'));
+      const approvals = Array.from(box.querySelectorAll('.tool-approval'));
+      choices.forEach(function (c) {
+        c.disabled = !mount.checked;
+        // 审批只对已选中的工具生效
+        const row = c.closest('[data-tool-choice]');
+        const approval = row && row.querySelector('.tool-approval');
+        if (approval) approval.disabled = !mount.checked || !c.checked;
+      });
+      approvals.forEach(function (a) {
+        if (a.disabled) a.checked = false;
+      });
+    }
+
+    function setupCard(box) {
+      const mount = box.querySelector('.mount-toggle');
+      if (!mount) return;
+      if (box.dataset.mountBound !== '1') {
+        mount.addEventListener('change', function () { syncCard(box); });
+        box.dataset.mountBound = '1';
+      }
+      box.querySelectorAll('.tool-choice').forEach(function (c) {
+        if (c.dataset.choiceBound === '1') return;
+        c.addEventListener('change', function () { syncCard(box); });
+        c.dataset.choiceBound = '1';
+      });
+      syncCard(box);
+    }
+
+    // ———把后端拉取到的工具清单渲染成和模板一致的勾选结构 ———
+    function buildToolChoices(box, toolId, items) {
+      const details = el('details', 'tool-choices mt-2 pl-6');
+      details.open = true;
+
+      const summary = el('summary', 'cursor-pointer select-none text-xs font-medium text-[#3b82f6]');
+      summary.appendChild(document.createTextNode('选择具体工具 '));
+      const hint = el('span', 'font-normal text-gray-500');
+      hint.textContent = '（默认全选）';
+      summary.appendChild(hint);
+      details.appendChild(summary);
+
+      const grid = el('div', 'mt-2 grid gap-1.5 md:grid-cols-2');
+      items.forEach(function (item) {
+        const row = el('div', 'flex items-start gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-1.5');
+        row.setAttribute('data-tool-choice', '');
+
+        const label = el('label', 'flex min-w-0 flex-1 cursor-pointer items-start gap-2');
+        const check = el('input', 'tool-choice mt-0.5 h-3.5 w-3.5 flex-shrink-0 rounded border-gray-300 text-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]');
+        check.type = 'checkbox';
+        check.checked = true;
+        check.value = item.name;
+        check.setAttribute('data-tool-id', toolId);
+
+        const text = el('span', 'min-w-0 flex-1');
+        const nameEl = el('span', 'block truncate font-mono text-[11px] text-gray-700');
+        nameEl.textContent = item.name;
+        nameEl.title = item.name;
+        text.appendChild(nameEl);
+        if (item.description) {
+          const desc = el('span', 'mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-gray-500');
+          desc.textContent = item.description;
+          desc.title = item.description;
+          text.appendChild(desc);
+        }
+        label.appendChild(check);
+        label.appendChild(text);
+        row.appendChild(label);
+
+        const approvalWrap = el('span', 'flex flex-shrink-0 items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700');
+        approvalWrap.title = '勾选后，这个工具每次执行前都要人工确认';
+        const approval = el('input', 'tool-approval h-3 w-3 flex-shrink-0 cursor-pointer rounded border-amber-300 text-amber-500 focus:ring-2 focus:ring-amber-400');
+        approval.type = 'checkbox';
+        approval.value = item.name;
+        approval.setAttribute('data-tool-id', toolId);
+        approvalWrap.appendChild(approval);
+        approvalWrap.appendChild(document.createTextNode('审批'));
+        row.appendChild(approvalWrap);
+
+        grid.appendChild(row);
+      });
+
+      details.appendChild(grid);
+      return details;
+    }
+
+    // ———未拉取的配置：点一下就地连接 MCP 服务并展开工具清单 ———
+    document.querySelectorAll('.tool-probe').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const toolId = btn.getAttribute('data-tool-id');
+        const box = btn.closest('[data-tool-config]');
+        const hint = btn.closest('.tool-unpulled');
+        const label = btn.textContent;
+
+        btn.disabled = true;
+        btn.textContent = '拉取中…';
+
+        fetch('/admin/tools/' + encodeURIComponent(toolId) + '/probe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': 'application/json'
+          },
+          body: new URLSearchParams({ csrf: csrf }).toString()
+        })
+          .then(function (res) {
+            return res.json().then(function (data) { return { res: res, data: data }; });
+          })
+          .then(function (result) {
+            const data = result.data || {};
+            if (!result.res.ok || !data.ok) throw new Error(data.msg || '拉取失败');
+            const items = data.tools || [];
+            if (!items.length) throw new Error('没有发现可用工具');
+
+            const details = buildToolChoices(box, toolId, items);
+            if (hint) {
+              hint.replaceWith(details);
+            } else {
+              box.appendChild(details);
+            }
+
+            const badge = box.querySelector('.tool-count-badge');
+            if (badge) {
+              badge.className = 'tool-count-badge inline-flex items-center rounded-full bg-[#3b82f6]/10 px-2 py-0.5 text-[10px] font-medium text-[#3b82f6]';
+              badge.textContent = items.length + ' 个工具';
+            }
+            setupCard(box);
+          })
+          .catch(function (err) {
+            btn.disabled = false;
+            btn.textContent = label;
+            if (!hint) return;
+            let msg = hint.querySelector('.tool-probe-error');
+            if (!msg) {
+              msg = el('span', 'tool-probe-error ml-1 text-[#ef4444]');
+              hint.appendChild(msg);
+            }
+            msg.textContent = ' ' + (err.message || '拉取失败');
+          });
+      });
+    });
+
+    // ———配置列表分页（纯前端隐藏，跨页勾选不会丢） ———
+    const cards = Array.from(document.querySelectorAll('[data-tool-config]'));
+    const pager = document.getElementById('tool_pager');
+    let page = 1;
+
+    function renderPager() {
+      const totalPages = Math.max(1, Math.ceil(cards.length / PAGE_SIZE));
+      page = Math.min(Math.max(1, page), totalPages);
+
+      cards.forEach(function (card, index) {
+        card.classList.toggle('hidden', Math.floor(index / PAGE_SIZE) !== page - 1);
+      });
+      if (!pager) return;
+
+      pager.innerHTML = '';
+      pager.classList.remove('hidden');
+      pager.classList.add('flex');
+
+      const info = el('span', '');
+      info.textContent = '共 ' + cards.length + ' 个工具配置 · 第 ' + page + ' / ' + totalPages + ' 页';
+      pager.appendChild(info);
+
+      const nav = el('div', 'flex flex-wrap items-center gap-1');
+
+      function pageButton(text, target, disabled, active) {
+        const b = el('button', 'inline-flex min-w-7 items-center justify-center rounded-md border px-2 py-1 text-xs font-medium transition-colors duration-150 ease-out ' +
+          (active
+            ? 'border-[#3b82f6] bg-[#3b82f6] text-white'
+            : disabled
+              ? 'cursor-not-allowed border-gray-200 bg-white text-gray-300'
+              : 'border-gray-200 bg-white text-gray-600 hover:border-[#3b82f6] hover:text-[#3b82f6]'));
+        b.type = 'button';
+        b.textContent = text;
+        b.disabled = disabled;
+        if (!disabled && !active) {
+          b.addEventListener('click', function () {
+            page = target;
+            renderPager();
+          });
+        }
+        return b;
+      }
+
+      nav.appendChild(pageButton('上一页', page - 1, page <= 1, false));
+      for (let i = 1; i <= totalPages; i += 1) {
+        nav.appendChild(pageButton(String(i), i, false, i === page));
+      }
+      nav.appendChild(pageButton('下一页', page + 1, page >= totalPages, false));
+      pager.appendChild(nav);
+    }
+
+    if (cards.length > PAGE_SIZE) renderPager();
+
+    form.addEventListener('submit', function () {
+      const out = {};
+      const approvals = [];
+      document.querySelectorAll('[data-tool-config]').forEach(function (box) {
+        const mount = box.querySelector('.mount-toggle');
+        if (!mount || !mount.checked) return;
+        const choices = Array.from(box.querySelectorAll('.tool-choice'));
+        // 没有拉取到清单：不写这个 key，后端按「全部工具」处理
+        if (!choices.length) return;
+        out[mount.value] = choices
+          .filter(function (c) { return c.checked; })
+          .map(function (c) { return c.value; });
+        box.querySelectorAll('.tool-approval').forEach(function (a) {
+          if (a.checked && !a.disabled) approvals.push(a.value);
+        });
+      });
+      hidden.value = JSON.stringify(out);
+      if (approvalHidden) {
+        approvalHidden.value = JSON.stringify(Array.from(new Set(approvals)));
+      }
+    });
+  })();
+</script>
+{% endblock %}
