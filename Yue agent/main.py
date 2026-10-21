@@ -1,3 +1,5 @@
+import sys
+
 import uvicorn
 import logging
 from contextlib import asynccontextmanager
@@ -75,7 +77,10 @@ if __name__ == "__main__":
     # 必须以 "模块:属性" 字符串传入，reload=True 才生效。
     # 只监听项目目录，排除 .venv / data / 缓存，避免安装依赖时误触发重启。
     run_kwargs: dict = {"host": "127.0.0.1", "port": 8000}
-    if settings.APP_RELOAD:
+    # 打包成 exe（PyInstaller）后 multi-process reload 不可用：
+    # 子进程无法正常导入模块，服务永远起不来。frozen 时强制关闭。
+    frozen = getattr(sys, "frozen", False)
+    if settings.APP_RELOAD and not frozen:
         run_kwargs.update(
             reload=True,
             reload_dirs=[str(BASE_DIR)],
@@ -89,4 +94,9 @@ if __name__ == "__main__":
                 "*.log",
             ],
         )
-    uvicorn.run("main:app", **run_kwargs)
+    if frozen:
+        # 打包后直接传 app 对象：字符串 "main:app" 依赖 import 机制，
+        # 在 PyInstaller 单文件环境下不可靠。
+        uvicorn.run(app, **run_kwargs)
+    else:
+        uvicorn.run("main:app", **run_kwargs)
